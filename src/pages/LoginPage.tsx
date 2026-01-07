@@ -7,7 +7,6 @@ export default function LoginPage() {
     const navigate = useNavigate();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [rememberMe, setRememberMe] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
 
     const handleLogin = (e: React.FormEvent) => {
@@ -91,23 +90,6 @@ export default function LoginPage() {
                                     )}
                                 </button>
                             </div>
-                        </div>
-
-                        {/* Remember Me & Forgot Password */}
-                        <div className="flex items-center justify-between">
-                            <label className="flex items-center space-x-2 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={rememberMe}
-                                    onChange={(e) => setRememberMe(e.target.checked)}
-                                    className="w-4 h-4 rounded border bg-white focus:ring-2"
-                                    style={{ borderColor: 'rgba(169, 169, 169, 0.4)', accentColor: 'var(--color-primary)', '--tw-ring-color': 'var(--color-info)' } as React.CSSProperties}
-                                />
-                                <span className="text-sm" style={{ color: 'var(--color-dark-gray)' }}>Ingat saya</span>
-                            </label>
-                            <a href="#" className="text-sm transition-colors hover:opacity-80" style={{ color: 'var(--color-info)' }}>
-                                Lupa kata sandi?
-                            </a>
                         </div>
 
                         {/* Login Button */}
