@@ -1,13 +1,17 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Phone, MapPin, Calendar, Shield, Bell, User, Edit3, Camera, Activity } from 'lucide-react';
+import { Mail, Phone, MapPin, Calendar, Shield, User, Edit3, Camera, Activity, X, Lock, Eye, EyeOff } from 'lucide-react';
 import { showToast } from '../utils/toast';
 import DashboardLayout from '../components/DashboardLayout';
 
 export default function ProfilePage() {
     const navigate = useNavigate();
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+    const [showPasswords, setShowPasswords] = useState({ old: false, new: false, confirm: false });
 
     // Mock data for the current user
-    const user = {
+    const [user, setUser] = useState({
         name: 'Alvin Yoga',
         email: 'alvineyoga@example.com',
         phone: '+62 812-3456-7890',
@@ -16,10 +20,40 @@ export default function ProfilePage() {
         joinDate: '15 September 2023',
         role: 'Super Admin',
         avatar: 'AY'
+    });
+
+    const [editForm, setEditForm] = useState({
+        name: user.name,
+        phone: user.phone,
+        address: user.address
+    });
+
+    const [passwordForm, setPasswordForm] = useState({
+        oldPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+    });
+
+    const handleEditSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        setUser({ ...user, ...editForm });
+        setIsEditModalOpen(false);
+        showToast.success('Profil berhasil diperbaharui!');
     };
 
-    const handleEditProfile = () => {
-        showToast.info('Fitur edit profil akan segera hadir!');
+    const handlePasswordSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+            showToast.error('Password baru tidak cocok!');
+            return;
+        }
+        if (passwordForm.newPassword.length < 6) {
+            showToast.error('Password minimal 6 karakter!');
+            return;
+        }
+        showToast.success('Password berhasil diubah!');
+        setIsPasswordModalOpen(false);
+        setPasswordForm({ oldPassword: '', newPassword: '', confirmPassword: '' });
     };
 
     return (
@@ -45,7 +79,7 @@ export default function ProfilePage() {
                                 </div>
                             </div>
                             <button
-                                onClick={handleEditProfile}
+                                onClick={() => setIsEditModalOpen(true)}
                                 className="flex items-center space-x-2 px-6 py-3 bg-blue-500 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-600 hover:scale-[1.02] transition-all"
                             >
                                 <Edit3 className="w-5 h-5" />
@@ -118,7 +152,10 @@ export default function ProfilePage() {
                                 <span>Keamanan Akun</span>
                             </h2>
                             <div className="space-y-6">
-                                <div className="flex items-center justify-between p-4 border-2 border-dashed border-gray-100 rounded-2xl hover:border-blue-100 transition-colors cursor-pointer group" onClick={() => showToast.info('Ubah password')}>
+                                <div
+                                    className="flex items-center justify-between p-4 border-2 border-dashed border-gray-100 rounded-2xl hover:border-blue-100 transition-colors cursor-pointer group"
+                                    onClick={() => setIsPasswordModalOpen(true)}
+                                >
                                     <div className="flex items-center space-x-4">
                                         <div className="p-2 bg-gray-50 rounded-xl group-hover:bg-blue-50 transition-colors">
                                             <Shield className="w-5 h-5 text-gray-400 group-hover:text-blue-500" />
@@ -130,20 +167,6 @@ export default function ProfilePage() {
                                     </div>
                                     <div className="text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity">
                                         <Edit3 className="w-5 h-5" />
-                                    </div>
-                                </div>
-                                <div className="flex items-center justify-between p-4 border-2 border-dashed border-gray-100 rounded-2xl hover:border-blue-100 transition-colors cursor-pointer group" onClick={() => showToast.info('Dua langkah autentikasi')}>
-                                    <div className="flex items-center space-x-4">
-                                        <div className="p-2 bg-gray-50 rounded-xl group-hover:bg-blue-50 transition-colors">
-                                            <Bell className="w-5 h-5 text-gray-400 group-hover:text-blue-500" />
-                                        </div>
-                                        <div>
-                                            <p className="font-bold text-gray-700">Otentikasi Dua Faktor (2FA)</p>
-                                            <p className="text-sm text-gray-400">Amankan akun Anda dengan verifikasi tambahan</p>
-                                        </div>
-                                    </div>
-                                    <div className="text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity font-bold text-sm">
-                                        Aktifkan
                                     </div>
                                 </div>
                             </div>
@@ -165,20 +188,185 @@ export default function ProfilePage() {
                                 Lihat Log Aktivitas
                             </button>
                         </div>
-
-                        <div className="bg-linear-to-br from-blue-600 to-cyan-600 rounded-3xl shadow-lg p-8 text-white">
-                            <h3 className="text-xl font-bold mb-4">Butuh Bantuan?</h3>
-                            <p className="text-blue-100 mb-6 text-sm">Tim dukungan kami siap membantu Anda 24/7 untuk masalah teknis apa pun.</p>
-                            <button
-                                onClick={() => showToast.info('Menghubungi support...')}
-                                className="w-full py-3 bg-white/20 text-white font-bold rounded-2xl hover:bg-white/30 transition-colors border border-white/30"
-                            >
-                                Hubungi Support
-                            </button>
-                        </div>
                     </div>
                 </div>
             </div>
+
+            {/* Edit Profile Modal */}
+            {isEditModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setIsEditModalOpen(false)}></div>
+                    <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-300">
+                        <div className="p-6 border-b flex items-center justify-between">
+                            <h3 className="text-xl font-bold flex items-center space-x-2" style={{ color: 'var(--color-primary)' }}>
+                                <Edit3 className="w-5 h-5 text-blue-500" />
+                                <span>Edit Profil</span>
+                            </h3>
+                            <button onClick={() => setIsEditModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
+                                <X className="w-5 h-5 text-gray-400" />
+                            </button>
+                        </div>
+                        <form onSubmit={handleEditSubmit} className="p-6 space-y-6">
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-gray-600 ml-1">Nama Lengkap</label>
+                                <div className="relative">
+                                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                    <input
+                                        type="text"
+                                        required
+                                        className="w-full pl-12 pr-4 py-3 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 transition-all font-medium"
+                                        value={editForm.name}
+                                        onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                                        placeholder="Masukkan nama lengkap"
+                                    />
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-gray-600 ml-1">Nomor Telepon</label>
+                                <div className="relative">
+                                    <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                    <input
+                                        type="tel"
+                                        required
+                                        className="w-full pl-12 pr-4 py-3 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 transition-all font-medium"
+                                        value={editForm.phone}
+                                        onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                                        placeholder="Masukkan nomor telepon"
+                                    />
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-gray-600 ml-1">Alamat</label>
+                                <div className="relative">
+                                    <MapPin className="absolute left-4 top-4 w-5 h-5 text-gray-400" />
+                                    <textarea
+                                        rows={3}
+                                        required
+                                        className="w-full pl-12 pr-4 py-3 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 transition-all font-medium resize-none"
+                                        value={editForm.address}
+                                        onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+                                        placeholder="Masukkan alamat lengkap"
+                                    ></textarea>
+                                </div>
+                            </div>
+                            <div className="flex space-x-4 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsEditModalOpen(false)}
+                                    className="flex-1 py-4 bg-gray-100 text-gray-600 font-bold rounded-2xl hover:bg-gray-200 transition-colors"
+                                >
+                                    Batal
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="flex-1 py-4 bg-blue-500 text-white font-bold rounded-2xl shadow-lg shadow-blue-100 hover:bg-blue-600 hover:scale-[1.02] active:scale-95 transition-all"
+                                >
+                                    Simpan Perubahan
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Change Password Modal */}
+            {isPasswordModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setIsPasswordModalOpen(false)}></div>
+                    <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-300">
+                        <div className="p-6 border-b flex items-center justify-between">
+                            <h3 className="text-xl font-bold flex items-center space-x-2" style={{ color: 'var(--color-primary)' }}>
+                                <Lock className="w-5 h-5 text-green-500" />
+                                <span>Ubah Password</span>
+                            </h3>
+                            <button onClick={() => setIsPasswordModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
+                                <X className="w-5 h-5 text-gray-400" />
+                            </button>
+                        </div>
+                        <form onSubmit={handlePasswordSubmit} className="p-6 space-y-6">
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-gray-600 ml-1">Password Lama</label>
+                                <div className="relative">
+                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                    <input
+                                        type={showPasswords.old ? "text" : "password"}
+                                        required
+                                        className="w-full pl-12 pr-12 py-3 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-green-500 transition-all font-medium"
+                                        value={passwordForm.oldPassword}
+                                        onChange={(e) => setPasswordForm({ ...passwordForm, oldPassword: e.target.value })}
+                                        placeholder="••••••••"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPasswords({ ...showPasswords, old: !showPasswords.old })}
+                                        className="absolute right-4 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                                    >
+                                        {showPasswords.old ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-gray-600 ml-1">Password Baru</label>
+                                <div className="relative">
+                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                    <input
+                                        type={showPasswords.new ? "text" : "password"}
+                                        required
+                                        className="w-full pl-12 pr-12 py-3 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-green-500 transition-all font-medium"
+                                        value={passwordForm.newPassword}
+                                        onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                                        placeholder="••••••••"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPasswords({ ...showPasswords, new: !showPasswords.new })}
+                                        className="absolute right-4 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                                    >
+                                        {showPasswords.new ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-gray-600 ml-1">Konfirmasi Password Baru</label>
+                                <div className="relative">
+                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                    <input
+                                        type={showPasswords.confirm ? "text" : "password"}
+                                        required
+                                        className="w-full pl-12 pr-12 py-3 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-green-500 transition-all font-medium"
+                                        value={passwordForm.confirmPassword}
+                                        onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                                        placeholder="••••••••"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPasswords({ ...showPasswords, confirm: !showPasswords.confirm })}
+                                        className="absolute right-4 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                                    >
+                                        {showPasswords.confirm ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="flex space-x-4 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsPasswordModalOpen(false)}
+                                    className="flex-1 py-4 bg-gray-100 text-gray-600 font-bold rounded-2xl hover:bg-gray-200 transition-colors"
+                                >
+                                    Batal
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="flex-1 py-4 bg-green-500 text-white font-bold rounded-2xl shadow-lg shadow-green-100 hover:bg-green-600 hover:scale-[1.02] active:scale-95 transition-all"
+                                >
+                                    Update Password
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </DashboardLayout>
     );
 }
+

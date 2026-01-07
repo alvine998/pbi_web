@@ -16,6 +16,8 @@ import ActivityLogPage from './pages/ActivityLogPage';
 import NewsPage from './pages/NewsPage';
 import ProductFormPage from './pages/ProductFormPage';
 import ProfilePage from './pages/ProfilePage';
+import NotificationsPage from './pages/NotificationsPage';
+import NotificationDetailPage from './pages/NotificationDetailPage';
 
 function App() {
   return (
@@ -39,6 +41,8 @@ function App() {
       <Route path="/activity-log" element={<ActivityLogPage />} />
       <Route path="/news" element={<NewsPage />} />
       <Route path="/profile" element={<ProfilePage />} />
+      <Route path="/notifications" element={<NotificationsPage />} />
+      <Route path="/notifications/:id" element={<NotificationDetailPage />} />
     </Routes>
   );
 }

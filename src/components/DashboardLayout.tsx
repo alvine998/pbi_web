@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BarChart3, TrendingUp, Users, LogOut, Menu, X, Bell, User, Package, Image, Share2, Calendar, MessageSquare, ClipboardList, MessageCircle, Activity, Newspaper } from 'lucide-react';
+import { BarChart3, Users, LogOut, Bell, User, Package, Image, Share2, Calendar, MessageSquare, ClipboardList, MessageCircle, Activity, Newspaper } from 'lucide-react';
 import { showToast } from '../utils/toast';
 
 interface DashboardLayoutProps {
@@ -9,7 +9,7 @@ interface DashboardLayoutProps {
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
     const navigate = useNavigate();
-    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [isSidebarOpen] = useState(true);
     const [isNotificationOpen, setIsNotificationOpen] = useState(false);
 
     const handleLogout = () => {
@@ -19,12 +19,18 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         }, 500);
     };
 
-    const notifications = [
+    const [notifications, setNotifications] = useState([
         { id: 1, title: 'Pengguna baru terdaftar', message: 'John Doe baru saja mendaftar', time: '2 menit yang lalu', unread: true },
         { id: 2, title: 'Proyek selesai', message: 'Website Redesign telah selesai', time: '1 jam yang lalu', unread: true },
         { id: 3, title: 'Pembayaran diterima', message: 'Pembayaran Rp 5.000.000 diterima', time: '3 jam yang lalu', unread: false },
         { id: 4, title: 'Pesan baru', message: 'Anda memiliki 3 pesan baru', time: '5 jam yang lalu', unread: false },
-    ];
+    ]);
+
+    const markAllAsRead = () => {
+        setNotifications(notifications.map(n => ({ ...n, unread: false })));
+        setIsNotificationOpen(false);
+        showToast.success('Semua notifikasi ditandai sebagai dibaca');
+    };
 
     return (
         <div className="min-h-screen" style={{ backgroundColor: 'var(--color-secondary)' }}>
@@ -132,8 +138,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                                                                 backgroundColor: notification.unread ? 'rgba(101, 174, 197, 0.05)' : 'transparent'
                                                             }}
                                                             onClick={() => {
-                                                                showToast.info(`Membuka: ${notification.title}`);
                                                                 setIsNotificationOpen(false);
+                                                                navigate(`/notifications/${notification.id}`);
                                                             }}
                                                         >
                                                             <div className="flex items-start space-x-3">
@@ -156,16 +162,24 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                                                     ))}
                                                 </div>
                                                 <div className="p-3 text-center border-t" style={{ borderColor: 'rgba(169, 169, 169, 0.2)' }}>
-                                                    <button
-                                                        className="text-sm font-semibold hover:opacity-80 transition-opacity"
-                                                        style={{ color: 'var(--color-primary)' }}
-                                                        onClick={() => {
-                                                            showToast.success('Semua notifikasi ditandai sebagai dibaca');
-                                                            setIsNotificationOpen(false);
-                                                        }}
-                                                    >
-                                                        Tandai semua sebagai dibaca
-                                                    </button>
+                                                    <div className="flex flex-col">
+                                                        <button
+                                                            className="p-3 text-sm font-bold hover:bg-gray-50 transition-colors border-b"
+                                                            style={{ color: 'var(--color-primary)', borderColor: 'rgba(169, 169, 169, 0.1)' }}
+                                                            onClick={markAllAsRead}
+                                                        >
+                                                            Tandai semua sebagai dibaca
+                                                        </button>
+                                                        <button
+                                                            className="p-3 text-sm font-bold text-blue-500 hover:bg-blue-50 transition-colors"
+                                                            onClick={() => {
+                                                                setIsNotificationOpen(false);
+                                                                navigate('/notifications');
+                                                            }}
+                                                        >
+                                                            Lihat semua notifikasi
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </>

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Search, Send, User, Paperclip, MoreVertical, Phone, Video, Info, Check, CheckCheck, Smile, Image as ImageIcon } from 'lucide-react';
+import { Search, Send, User, Paperclip, MoreVertical, Phone, Info, Check, CheckCheck, Smile, Image as ImageIcon } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
 
 interface Message {
