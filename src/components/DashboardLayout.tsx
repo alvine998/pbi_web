@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BarChart3, Users, LogOut, Bell, User, Package, Image, Share2, Calendar, MessageSquare, ClipboardList, MessageCircle, Activity, Newspaper } from 'lucide-react';
+import { BarChart3, Users, LogOut, Bell, User, Package, Image, Share2, Calendar, MessageSquare, ClipboardList, MessageCircle, Activity, Newspaper, Heart } from 'lucide-react';
 import { showToast } from '../utils/toast';
 
 interface DashboardLayoutProps {
@@ -64,6 +64,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                                 { icon: MessageCircle, label: 'Live Chat', path: '/chat' },
                                 { icon: Activity, label: 'Activity Log', path: '/activity-log' },
                                 { icon: Newspaper, label: 'Berita', path: '/news' },
+                                { icon: Heart, label: 'Aspirasiku', path: '/aspirations' },
                             ].map((item) => {
                                 const Icon = item.icon;
                                 const isActive = window.location.pathname === item.path;

@@ -18,6 +18,8 @@ import ProductFormPage from './pages/ProductFormPage';
 import ProfilePage from './pages/ProfilePage';
 import NotificationsPage from './pages/NotificationsPage';
 import NotificationDetailPage from './pages/NotificationDetailPage';
+import NotFoundPage from './pages/NotFoundPage';
+import AspirationsPage from './pages/AspirationsPage';
 
 function App() {
   return (
@@ -43,6 +45,8 @@ function App() {
       <Route path="/profile" element={<ProfilePage />} />
       <Route path="/notifications" element={<NotificationsPage />} />
       <Route path="/notifications/:id" element={<NotificationDetailPage />} />
+      <Route path="/aspirations" element={<AspirationsPage />} />
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
 }
