@@ -177,9 +177,9 @@ export default function ProductDetailPage() {
                                         <button
                                             key={index}
                                             onClick={() => setSelectedImage(index)}
-                                            className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${selectedImage === index
-                                                    ? 'border-blue-500 shadow-md'
-                                                    : 'border-gray-200 hover:border-gray-300'
+                                            className={`shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${selectedImage === index
+                                                ? 'border-blue-500 shadow-md'
+                                                : 'border-gray-200 hover:border-gray-300'
                                                 }`}
                                         >
                                             <img

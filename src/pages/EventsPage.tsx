@@ -363,7 +363,7 @@ export default function EventsPage() {
                             <div className="grid grid-cols-1 gap-6">
                                 {events.map((event) => (
                                     <div key={event.id} className="bg-white rounded-2xl shadow-lg overflow-hidden flex flex-col md:flex-row hover:shadow-xl transition-shadow group ring-1 ring-gray-100">
-                                        <div className="w-full md:w-64 h-48 bg-gray-100 flex items-center justify-center relative flex-shrink-0">
+                                        <div className="w-full md:w-64 h-48 bg-gray-100 flex items-center justify-center relative shrink-0">
                                             {event.image ? (
                                                 <img src={event.image} alt={event.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                                             ) : (
