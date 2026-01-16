@@ -1,9 +1,9 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Edit2, Trash2, Filter, X, Eye } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Search, Plus, Edit2, Trash2, Filter, X, Loader2, AlertCircle } from 'lucide-react';
 import { showToast } from '../utils/toast';
 import DashboardLayout from '../components/DashboardLayout';
 import Pagination from '../components/Pagination';
+import api from '../utils/api';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -12,64 +12,264 @@ interface User {
     name: string;
     email: string;
     role: string;
-    status: 'Aktif' | 'Nonaktif';
-    avatar: string;
+    status: string;
+    phone?: string;
+    avatar?: string;
+    lastLogin?: string;
+    createdAt?: string;
+    updatedAt?: string;
+}
+
+interface UserFormData {
+    name: string;
+    email: string;
+    password: string;
+    role: string;
+    status: string;
+    phone: string;
 }
 
 export default function UsersPage() {
-    const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState('');
-    const [roleFilter, setRoleFilter] = useState('Semua');
-    const [statusFilter, setStatusFilter] = useState('Semua');
-    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-    const [users, setUsers] = useState<User[]>([
-        { id: 1, name: 'Budi Santoso', email: 'budi@example.com', role: 'Admin', status: 'Aktif', avatar: 'BS' },
-        { id: 2, name: 'Siti Nurhaliza', email: 'siti@example.com', role: 'Editor', status: 'Aktif', avatar: 'SN' },
-        { id: 3, name: 'Ahmad Rizki', email: 'ahmad@example.com', role: 'Viewer', status: 'Aktif', avatar: 'AR' },
-        { id: 4, name: 'Dewi Lestari', email: 'dewi@example.com', role: 'Editor', status: 'Nonaktif', avatar: 'DL' },
-        { id: 5, name: 'Rudi Hermawan', email: 'rudi@example.com', role: 'Viewer', status: 'Aktif', avatar: 'RH' },
-        { id: 6, name: 'Linda Wati', email: 'linda@example.com', role: 'Editor', status: 'Aktif', avatar: 'LW' },
-        { id: 7, name: 'Eko Prasetyo', email: 'eko@example.com', role: 'Viewer', status: 'Aktif', avatar: 'EP' },
-        { id: 8, name: 'Maya Sari', email: 'maya@example.com', role: 'Editor', status: 'Aktif', avatar: 'MS' },
-        { id: 9, name: 'Denny Caknan', email: 'denny@example.com', role: 'Viewer', status: 'Nonaktif', avatar: 'DC' },
-        { id: 10, name: 'Hendra Setiawan', email: 'hendra@example.com', role: 'Admin', status: 'Aktif', avatar: 'HS' },
-        { id: 11, name: 'Kevin Sanjaya', email: 'kevin@example.com', role: 'Editor', status: 'Aktif', avatar: 'KS' },
-        { id: 12, name: 'Greysia Polii', email: 'greysia@example.com', role: 'Viewer', status: 'Aktif', avatar: 'GP' },
-    ]);
-
+    const [roleFilter, setRoleFilter] = useState('');
+    const [statusFilter, setStatusFilter] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
 
-    const roles = ['Semua', 'Admin', 'Editor', 'Viewer'];
-    const statuses = ['Semua', 'Aktif', 'Nonaktif'];
+    const [users, setUsers] = useState<User[]>([]);
+    const [totalItems, setTotalItems] = useState(0);
+    const [totalPages, setTotalPages] = useState(0);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
-    const filteredUsers = users.filter(user => {
-        const matchesSearch = user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            user.email.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesRole = roleFilter === 'Semua' || user.role === roleFilter;
-        const matchesStatus = statusFilter === 'Semua' || user.status === statusFilter;
-        return matchesSearch && matchesRole && matchesStatus;
+    // Modal states
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [editingUser, setEditingUser] = useState<User | null>(null);
+    const [deletingUser, setDeletingUser] = useState<User | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const [formData, setFormData] = useState<UserFormData>({
+        name: '',
+        email: '',
+        password: '',
+        role: 'User',
+        status: 'Active',
+        phone: ''
     });
 
-    const totalPages = Math.ceil(filteredUsers.length / ITEMS_PER_PAGE);
-    const paginatedUsers = filteredUsers.slice(
-        (currentPage - 1) * ITEMS_PER_PAGE,
-        currentPage * ITEMS_PER_PAGE
-    );
+    const roles = ['User', 'Admin', 'Editor'];
+    const statuses = ['Active', 'Inactive'];
+
+    const fetchUsers = useCallback(async () => {
+        setIsLoading(true);
+        setError(null);
+
+        try {
+            const params = new URLSearchParams();
+            params.append('page', currentPage.toString());
+            params.append('limit', ITEMS_PER_PAGE.toString());
+
+            if (searchQuery) {
+                params.append('search', searchQuery);
+            }
+            if (roleFilter) {
+                params.append('role', roleFilter);
+            }
+            if (statusFilter) {
+                params.append('status', statusFilter);
+            }
+
+            const response = await api.get(`/users?${params.toString()}`);
+            const data = response.data;
+
+            console.log('Users API response:', data);
+
+            // Handle the response format
+            if (data.items) {
+                setUsers(data.items);
+                setTotalItems(data.totalItems || data.items.length);
+                setTotalPages(data.totalPages || Math.ceil((data.totalItems || data.items.length) / ITEMS_PER_PAGE));
+            } else if (Array.isArray(data)) {
+                setUsers(data);
+                setTotalItems(data.length);
+                setTotalPages(Math.ceil(data.length / ITEMS_PER_PAGE));
+            } else if (data.data) {
+                setUsers(Array.isArray(data.data) ? data.data : []);
+                setTotalItems(data.total || data.data.length);
+                setTotalPages(data.totalPages || Math.ceil(data.total / ITEMS_PER_PAGE));
+            } else {
+                setUsers([]);
+                setTotalItems(0);
+                setTotalPages(0);
+            }
+        } catch (err: any) {
+            console.error('Error fetching users:', err);
+            setError(err.response?.data?.message || 'Gagal memuat data pengguna');
+            setUsers([]);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [currentPage, searchQuery, roleFilter, statusFilter]);
+
+    useEffect(() => {
+        fetchUsers();
+    }, [fetchUsers]);
+
+    // Debounce search
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (currentPage !== 1) {
+                setCurrentPage(1);
+            }
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
 
     const handlePageChange = (page: number) => {
         setCurrentPage(page);
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
-    const handleDelete = (userId: number, userName: string) => {
-        if (window.confirm(`Apakah Anda yakin ingin menghapus ${userName}?`)) {
-            setUsers(users.filter(u => u.id !== userId));
-            showToast.success(`${userName} berhasil dihapus`);
+    const openCreateModal = () => {
+        setEditingUser(null);
+        setFormData({
+            name: '',
+            email: '',
+            password: '',
+            role: 'User',
+            status: 'Active',
+            phone: ''
+        });
+        setIsModalOpen(true);
+    };
+
+    const openEditModal = (user: User) => {
+        setEditingUser(user);
+        setFormData({
+            name: user.name,
+            email: user.email,
+            password: '',
+            role: user.role,
+            status: user.status,
+            phone: user.phone || ''
+        });
+        setIsModalOpen(true);
+    };
+
+    const openDeleteModal = (user: User) => {
+        setDeletingUser(user);
+        setIsDeleteModalOpen(true);
+    };
+
+    const closeModal = () => {
+        setIsModalOpen(false);
+        setEditingUser(null);
+        setFormData({
+            name: '',
+            email: '',
+            password: '',
+            role: 'User',
+            status: 'Active',
+            phone: ''
+        });
+    };
+
+    const closeDeleteModal = () => {
+        setIsDeleteModalOpen(false);
+        setDeletingUser(null);
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        if (!formData.name.trim() || !formData.email.trim()) {
+            showToast.error('Nama dan email wajib diisi');
+            return;
+        }
+
+        if (!editingUser && !formData.password) {
+            showToast.error('Password wajib diisi untuk pengguna baru');
+            return;
+        }
+
+        setIsSubmitting(true);
+        const loadingToast = showToast.loading(editingUser ? 'Menyimpan perubahan...' : 'Menambahkan pengguna...');
+
+        try {
+            const payload: any = {
+                name: formData.name,
+                email: formData.email,
+                role: formData.role,
+                status: formData.status,
+                phone: formData.phone
+            };
+
+            if (formData.password) {
+                payload.password = formData.password;
+            }
+
+            if (editingUser) {
+                await api.put(`/users/${editingUser.id}`, payload);
+                showToast.dismiss(loadingToast);
+                showToast.success('Pengguna berhasil diperbarui!');
+            } else {
+                await api.post('/users', payload);
+                showToast.dismiss(loadingToast);
+                showToast.success('Pengguna baru berhasil ditambahkan!');
+            }
+
+            closeModal();
+            fetchUsers();
+        } catch (err: any) {
+            showToast.dismiss(loadingToast);
+            showToast.error(err.response?.data?.message || 'Gagal menyimpan pengguna');
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
-    const handleEdit = (user: User) => {
-        showToast.info(`Edit ${user.name} - Fitur segera hadir`);
+    const handleDelete = async () => {
+        if (!deletingUser) return;
+
+        setIsSubmitting(true);
+        const loadingToast = showToast.loading('Menghapus pengguna...');
+
+        try {
+            await api.delete(`/users/${deletingUser.id}`);
+            showToast.dismiss(loadingToast);
+            showToast.success('Pengguna berhasil dihapus!');
+            closeDeleteModal();
+            fetchUsers();
+        } catch (err: any) {
+            showToast.dismiss(loadingToast);
+            showToast.error(err.response?.data?.message || 'Gagal menghapus pengguna');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const getInitials = (name: string) => {
+        return name
+            .split(' ')
+            .map(n => n[0])
+            .join('')
+            .toUpperCase()
+            .slice(0, 2);
+    };
+
+    const getRoleColor = (role: string) => {
+        switch (role.toLowerCase()) {
+            case 'admin':
+                return 'var(--color-danger)';
+            case 'editor':
+                return 'var(--color-warning)';
+            default:
+                return 'var(--color-info)';
+        }
+    };
+
+    const getStatusColor = (status: string) => {
+        return status.toLowerCase() === 'active' ? 'var(--color-success)' : 'var(--color-gray-custom)';
     };
 
     return (
@@ -86,7 +286,7 @@ export default function UsersPage() {
                         </p>
                     </div>
                     <button
-                        onClick={() => setIsAddModalOpen(true)}
+                        onClick={openCreateModal}
                         className="flex items-center space-x-2 px-6 py-3 rounded-xl text-white font-semibold shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300"
                         style={{ backgroundColor: 'var(--color-primary)' }}
                     >
@@ -104,10 +304,7 @@ export default function UsersPage() {
                                 type="text"
                                 placeholder="Cari nama atau email..."
                                 value={searchQuery}
-                                onChange={(e) => {
-                                    setSearchQuery(e.target.value);
-                                    setCurrentPage(1);
-                                }}
+                                onChange={(e) => setSearchQuery(e.target.value)}
                                 className="w-full pl-11 pr-4 py-3 bg-white border rounded-xl focus:outline-none focus:ring-2 transition-all duration-300"
                                 style={{ borderColor: 'rgba(169, 169, 169, 0.4)', '--tw-ring-color': 'var(--color-info)' } as React.CSSProperties}
                             />
@@ -123,8 +320,9 @@ export default function UsersPage() {
                                 className="w-full pl-11 pr-4 py-3 bg-white border rounded-xl focus:outline-none focus:ring-2 transition-all duration-300"
                                 style={{ borderColor: 'rgba(169, 169, 169, 0.4)', color: 'var(--color-dark-gray)', '--tw-ring-color': 'var(--color-info)' } as React.CSSProperties}
                             >
+                                <option value="">Semua Role</option>
                                 {roles.map(role => (
-                                    <option key={role} value={role}>Role: {role}</option>
+                                    <option key={role} value={role}>{role}</option>
                                 ))}
                             </select>
                         </div>
@@ -139,13 +337,22 @@ export default function UsersPage() {
                                 className="w-full pl-11 pr-4 py-3 bg-white border rounded-xl focus:outline-none focus:ring-2 transition-all duration-300"
                                 style={{ borderColor: 'rgba(169, 169, 169, 0.4)', color: 'var(--color-dark-gray)', '--tw-ring-color': 'var(--color-info)' } as React.CSSProperties}
                             >
+                                <option value="">Semua Status</option>
                                 {statuses.map(status => (
-                                    <option key={status} value={status}>Status: {status}</option>
+                                    <option key={status} value={status}>{status}</option>
                                 ))}
                             </select>
                         </div>
                     </div>
                 </div>
+
+                {/* Error State */}
+                {error && (
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 flex items-center space-x-3">
+                        <AlertCircle className="w-5 h-5 text-red-500" />
+                        <span className="text-red-700">{error}</span>
+                    </div>
+                )}
 
                 {/* Users Table */}
                 <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
@@ -161,27 +368,49 @@ export default function UsersPage() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {paginatedUsers.length === 0 ? (
+                                {isLoading ? (
+                                    <tr>
+                                        <td colSpan={5} className="px-6 py-12 text-center">
+                                            <div className="flex flex-col items-center space-y-3">
+                                                <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--color-primary)' }} />
+                                                <span style={{ color: 'var(--color-gray-custom)' }}>Memuat data...</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ) : users.length === 0 ? (
                                     <tr>
                                         <td colSpan={5} className="px-6 py-12 text-center" style={{ color: 'var(--color-gray-custom)' }}>
                                             Tidak ada pengguna ditemukan
                                         </td>
                                     </tr>
                                 ) : (
-                                    paginatedUsers.map((user) => (
-                                        <tr key={user.id} className="border-t hover:opacity-90 transition-opacity" style={{ borderColor: 'rgba(169, 169, 169, 0.1)' }}>
+                                    users.map((user) => (
+                                        <tr key={user.id} className="border-t hover:bg-gray-50 transition-colors" style={{ borderColor: 'rgba(169, 169, 169, 0.1)' }}>
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center space-x-3">
-                                                    <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold" style={{ backgroundColor: 'var(--color-info)' }}>
-                                                        {user.avatar}
+                                                    {user.avatar ? (
+                                                        <img
+                                                            src={user.avatar}
+                                                            alt={user.name}
+                                                            className="w-10 h-10 rounded-full object-cover"
+                                                        />
+                                                    ) : (
+                                                        <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold" style={{ backgroundColor: 'var(--color-info)' }}>
+                                                            {getInitials(user.name)}
+                                                        </div>
+                                                    )}
+                                                    <div>
+                                                        <span className="font-medium block" style={{ color: 'var(--color-dark-gray)' }}>{user.name}</span>
+                                                        {user.phone && (
+                                                            <span className="text-xs" style={{ color: 'var(--color-gray-custom)' }}>{user.phone}</span>
+                                                        )}
                                                     </div>
-                                                    <span className="font-medium" style={{ color: 'var(--color-dark-gray)' }}>{user.name}</span>
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4" style={{ color: 'var(--color-gray-custom)' }}>{user.email}</td>
                                             <td className="px-6 py-4">
                                                 <span className="px-3 py-1 rounded-full text-xs font-semibold" style={{
-                                                    backgroundColor: user.role === 'Admin' ? 'var(--color-danger)' : user.role === 'Editor' ? 'var(--color-warning)' : 'var(--color-info)',
+                                                    backgroundColor: getRoleColor(user.role),
                                                     color: '#fff'
                                                 }}>
                                                     {user.role}
@@ -189,7 +418,7 @@ export default function UsersPage() {
                                             </td>
                                             <td className="px-6 py-4">
                                                 <span className="px-3 py-1 rounded-full text-xs font-semibold" style={{
-                                                    backgroundColor: user.status === 'Aktif' ? 'var(--color-success)' : 'var(--color-gray-custom)',
+                                                    backgroundColor: getStatusColor(user.status),
                                                     color: '#fff'
                                                 }}>
                                                     {user.status}
@@ -197,24 +426,27 @@ export default function UsersPage() {
                                             </td>
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center justify-center space-x-2">
-                                                    <button
+                                                    {/* <button
                                                         onClick={() => navigate(`/users/${user.id}`)}
                                                         className="p-2 rounded-lg hover:opacity-80 transition-opacity"
                                                         style={{ backgroundColor: 'var(--color-info)' }}
+                                                        title="Lihat Detail"
                                                     >
                                                         <Eye className="w-4 h-4 text-white" />
-                                                    </button>
+                                                    </button> */}
                                                     <button
-                                                        onClick={() => handleEdit(user)}
+                                                        onClick={() => openEditModal(user)}
                                                         className="p-2 rounded-lg hover:opacity-80 transition-opacity"
                                                         style={{ backgroundColor: 'var(--color-warning)' }}
+                                                        title="Edit"
                                                     >
                                                         <Edit2 className="w-4 h-4 text-white" />
                                                     </button>
                                                     <button
-                                                        onClick={() => handleDelete(user.id, user.name)}
+                                                        onClick={() => openDeleteModal(user)}
                                                         className="p-2 rounded-lg hover:opacity-80 transition-opacity"
                                                         style={{ backgroundColor: 'var(--color-danger)' }}
+                                                        title="Hapus"
                                                     >
                                                         <Trash2 className="w-4 h-4 text-white" />
                                                     </button>
@@ -228,7 +460,7 @@ export default function UsersPage() {
                     </div>
                     <div className="px-6 py-4 border-t flex items-center justify-between" style={{ borderColor: 'rgba(169, 169, 169, 0.1)', backgroundColor: 'var(--color-secondary)' }}>
                         <p className="text-sm" style={{ color: 'var(--color-dark-gray)' }}>
-                            Menampilkan {paginatedUsers.length} dari {filteredUsers.length} pengguna
+                            Menampilkan {users.length} dari {totalItems} pengguna
                         </p>
                     </div>
                 </div>
@@ -237,55 +469,169 @@ export default function UsersPage() {
                     currentPage={currentPage}
                     totalPages={totalPages}
                     onPageChange={handlePageChange}
-                    totalItems={filteredUsers.length}
+                    totalItems={totalItems}
                     itemsPerPage={ITEMS_PER_PAGE}
                 />
 
-                {/* Add User Modal */}
-                {isAddModalOpen && (
-                    <>
-                        <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setIsAddModalOpen(false)}></div>
-                        <div className="fixed inset-0 flex items-center justify-center z-50">
-                            <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
-                                <div className="flex items-center justify-between mb-6">
-                                    <h2 className="text-2xl font-bold" style={{ color: 'var(--color-primary)' }}>Tambah Pengguna Baru</h2>
-                                    <button onClick={() => setIsAddModalOpen(false)} className="hover:opacity-70">
-                                        <X className="w-6 h-6" style={{ color: 'var(--color-dark-gray)' }} />
+                {/* Create/Edit Modal */}
+                {isModalOpen && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+                            <div className="p-6 border-b" style={{ borderColor: 'rgba(169, 169, 169, 0.2)' }}>
+                                <div className="flex items-center justify-between">
+                                    <h2 className="text-xl font-bold" style={{ color: 'var(--color-primary)' }}>
+                                        {editingUser ? 'Edit Pengguna' : 'Tambah Pengguna Baru'}
+                                    </h2>
+                                    <button onClick={closeModal} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                                        <X className="w-5 h-5" style={{ color: 'var(--color-gray-custom)' }} />
                                     </button>
                                 </div>
-                                <form className="space-y-4" onSubmit={(e) => {
-                                    e.preventDefault();
-                                    showToast.success('Pengguna berhasil ditambahkan!');
-                                    setIsAddModalOpen(false);
-                                }}>
+                            </div>
+                            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-dark-gray)' }}>
+                                        Nama Lengkap <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={formData.name}
+                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                        placeholder="Masukkan nama lengkap"
+                                        className="w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 transition-all"
+                                        style={{ borderColor: 'rgba(169, 169, 169, 0.4)', '--tw-ring-color': 'var(--color-info)' } as React.CSSProperties}
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-dark-gray)' }}>
+                                        Email <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        type="email"
+                                        value={formData.email}
+                                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                        placeholder="Masukkan email"
+                                        className="w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 transition-all"
+                                        style={{ borderColor: 'rgba(169, 169, 169, 0.4)', '--tw-ring-color': 'var(--color-info)' } as React.CSSProperties}
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-dark-gray)' }}>
+                                        Password {!editingUser && <span className="text-red-500">*</span>}
+                                        {editingUser && <span className="text-xs font-normal">(kosongkan jika tidak diubah)</span>}
+                                    </label>
+                                    <input
+                                        type="password"
+                                        value={formData.password}
+                                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                                        placeholder={editingUser ? "Kosongkan jika tidak diubah" : "Masukkan password"}
+                                        className="w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 transition-all"
+                                        style={{ borderColor: 'rgba(169, 169, 169, 0.4)', '--tw-ring-color': 'var(--color-info)' } as React.CSSProperties}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-dark-gray)' }}>
+                                        Telepon
+                                    </label>
+                                    <input
+                                        type="tel"
+                                        value={formData.phone}
+                                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                        placeholder="Masukkan nomor telepon"
+                                        className="w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 transition-all"
+                                        style={{ borderColor: 'rgba(169, 169, 169, 0.4)', '--tw-ring-color': 'var(--color-info)' } as React.CSSProperties}
+                                    />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-dark-gray)' }}>Nama Lengkap</label>
-                                        <input type="text" required className="w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2" style={{ borderColor: 'rgba(169, 169, 169, 0.4)', '--tw-ring-color': 'var(--color-info)' } as React.CSSProperties} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-dark-gray)' }}>Email</label>
-                                        <input type="email" required className="w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2" style={{ borderColor: 'rgba(169, 169, 169, 0.4)', '--tw-ring-color': 'var(--color-info)' } as React.CSSProperties} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-dark-gray)' }}>Role</label>
-                                        <select required className="w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2" style={{ borderColor: 'rgba(169, 169, 169, 0.4)', '--tw-ring-color': 'var(--color-info)' } as React.CSSProperties}>
-                                            <option value="Viewer">Viewer</option>
-                                            <option value="Editor">Editor</option>
-                                            <option value="Admin">Admin</option>
+                                        <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-dark-gray)' }}>
+                                            Role
+                                        </label>
+                                        <select
+                                            value={formData.role}
+                                            onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                                            className="w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 transition-all"
+                                            style={{ borderColor: 'rgba(169, 169, 169, 0.4)', '--tw-ring-color': 'var(--color-info)' } as React.CSSProperties}
+                                        >
+                                            {roles.map(role => (
+                                                <option key={role} value={role}>{role}</option>
+                                            ))}
                                         </select>
                                     </div>
-                                    <div className="flex space-x-3 pt-4">
-                                        <button type="button" onClick={() => setIsAddModalOpen(false)} className="flex-1 px-4 py-3 border rounded-xl font-semibold hover:opacity-80 transition-opacity" style={{ borderColor: 'var(--color-gray-custom)', color: 'var(--color-dark-gray)' }}>
-                                            Batal
-                                        </button>
-                                        <button type="submit" className="flex-1 px-4 py-3 rounded-xl text-white font-semibold hover:opacity-90 transition-opacity" style={{ backgroundColor: 'var(--color-primary)' }}>
-                                            Simpan
-                                        </button>
+                                    <div>
+                                        <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-dark-gray)' }}>
+                                            Status
+                                        </label>
+                                        <select
+                                            value={formData.status}
+                                            onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                                            className="w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 transition-all"
+                                            style={{ borderColor: 'rgba(169, 169, 169, 0.4)', '--tw-ring-color': 'var(--color-info)' } as React.CSSProperties}
+                                        >
+                                            {statuses.map(status => (
+                                                <option key={status} value={status}>{status}</option>
+                                            ))}
+                                        </select>
                                     </div>
-                                </form>
+                                </div>
+                                <div className="flex space-x-3 pt-4">
+                                    <button
+                                        type="button"
+                                        onClick={closeModal}
+                                        className="flex-1 px-4 py-3 border rounded-xl font-medium hover:bg-gray-50 transition-colors"
+                                        style={{ borderColor: 'rgba(169, 169, 169, 0.4)', color: 'var(--color-gray-custom)' }}
+                                    >
+                                        Batal
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={isSubmitting}
+                                        className="flex-1 px-4 py-3 rounded-xl font-medium text-white transition-all disabled:opacity-50"
+                                        style={{ backgroundColor: 'var(--color-primary)' }}
+                                    >
+                                        {isSubmitting ? 'Menyimpan...' : editingUser ? 'Simpan Perubahan' : 'Tambah Pengguna'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )}
+
+                {/* Delete Confirmation Modal */}
+                {isDeleteModalOpen && deletingUser && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6">
+                            <div className="text-center">
+                                <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)' }}>
+                                    <Trash2 className="w-8 h-8 text-red-500" />
+                                </div>
+                                <h3 className="text-xl font-bold mb-2" style={{ color: 'var(--color-primary)' }}>
+                                    Hapus Pengguna?
+                                </h3>
+                                <p className="mb-6" style={{ color: 'var(--color-gray-custom)' }}>
+                                    Apakah Anda yakin ingin menghapus <strong>{deletingUser.name}</strong>? Tindakan ini tidak dapat dibatalkan.
+                                </p>
+                                <div className="flex space-x-3">
+                                    <button
+                                        onClick={closeDeleteModal}
+                                        className="flex-1 px-4 py-3 border rounded-xl font-medium hover:bg-gray-50 transition-colors"
+                                        style={{ borderColor: 'rgba(169, 169, 169, 0.4)', color: 'var(--color-gray-custom)' }}
+                                    >
+                                        Batal
+                                    </button>
+                                    <button
+                                        onClick={handleDelete}
+                                        disabled={isSubmitting}
+                                        className="flex-1 px-4 py-3 rounded-xl font-medium text-white transition-all disabled:opacity-50"
+                                        style={{ backgroundColor: 'var(--color-danger)' }}
+                                    >
+                                        {isSubmitting ? 'Menghapus...' : 'Ya, Hapus'}
+                                    </button>
+                                </div>
                             </div>
                         </div>
-                    </>
+                    </div>
                 )}
             </div>
         </DashboardLayout>

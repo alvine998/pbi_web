@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Search, Plus, Edit2, Trash2, X, Tag, AlertCircle } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Search, Plus, Edit2, Trash2, X, Tag, AlertCircle, Upload, Image as ImageIcon } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
 import Pagination from '../components/Pagination';
 import api from '../utils/api';
@@ -11,6 +11,8 @@ interface Category {
     id: number;
     name: string;
     description?: string;
+    icon?: string;
+    image?: string;
     createdAt?: string;
     updatedAt?: string;
 }
@@ -31,7 +33,10 @@ export default function ProductCategoriesPage() {
     const [editingCategory, setEditingCategory] = useState<Category | null>(null);
     const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
     const [formData, setFormData] = useState({ name: '', description: '' });
+    const [iconFile, setIconFile] = useState<File | null>(null);
+    const [iconPreview, setIconPreview] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const iconInputRef = useRef<HTMLInputElement>(null);
 
     const fetchCategories = useCallback(async () => {
         setIsLoading(true);
@@ -112,12 +117,16 @@ export default function ProductCategoriesPage() {
     const openCreateModal = () => {
         setEditingCategory(null);
         setFormData({ name: '', description: '' });
+        setIconFile(null);
+        setIconPreview(null);
         setIsModalOpen(true);
     };
 
     const openEditModal = (category: Category) => {
         setEditingCategory(category);
         setFormData({ name: category.name, description: category.description || '' });
+        setIconFile(null);
+        setIconPreview(category.icon || category.image || null);
         setIsModalOpen(true);
     };
 
@@ -130,6 +139,51 @@ export default function ProductCategoriesPage() {
         setIsModalOpen(false);
         setEditingCategory(null);
         setFormData({ name: '', description: '' });
+        setIconFile(null);
+        setIconPreview(null);
+    };
+
+    const handleIconChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (file.size > 2 * 1024 * 1024) {
+            showToast.error('Ukuran file maksimal 2MB');
+            return;
+        }
+
+        if (!file.type.startsWith('image/')) {
+            showToast.error('File harus berupa gambar');
+            return;
+        }
+
+        setIconFile(file);
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setIconPreview(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const removeIcon = () => {
+        setIconFile(null);
+        setIconPreview(null);
+        if (iconInputRef.current) iconInputRef.current.value = '';
+    };
+
+    // Upload icon to server
+    const uploadIcon = async (file: File): Promise<string> => {
+        const formDataUpload = new FormData();
+        formDataUpload.append('files', file, file.name);
+
+        const response = await api.post('/upload/multiple', formDataUpload, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        });
+
+        const uploadedFiles = response.data.files || [];
+        return uploadedFiles.length > 0 ? uploadedFiles[0].url : '';
     };
 
     const closeDeleteModal = () => {
@@ -149,12 +203,33 @@ export default function ProductCategoriesPage() {
         const loadingToast = showToast.loading(editingCategory ? 'Menyimpan perubahan...' : 'Menambahkan kategori...');
 
         try {
+            let iconUrl = editingCategory?.icon || editingCategory?.image || '';
+
+            // Upload new icon if selected
+            if (iconFile) {
+                try {
+                    iconUrl = await uploadIcon(iconFile);
+                } catch (uploadErr) {
+                    console.error('Icon upload failed:', uploadErr);
+                    showToast.dismiss(loadingToast);
+                    showToast.error('Gagal mengunggah ikon');
+                    setIsSubmitting(false);
+                    return;
+                }
+            }
+
+            const payload = {
+                name: formData.name,
+                description: formData.description,
+                icon: iconUrl
+            };
+
             if (editingCategory) {
-                await api.put(`/product/categories/${editingCategory.id}`, formData);
+                await api.put(`/product/categories/${editingCategory.id}`, payload);
                 showToast.dismiss(loadingToast);
                 showToast.success('Kategori berhasil diperbarui!');
             } else {
-                await api.post('/product/categories', formData);
+                await api.post('/product/categories', payload);
                 showToast.dismiss(loadingToast);
                 showToast.success('Kategori baru berhasil ditambahkan!');
             }
@@ -378,6 +453,57 @@ export default function ProductCategoriesPage() {
                                         className="w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 transition-all resize-none"
                                         style={{ borderColor: 'rgba(169, 169, 169, 0.4)', '--tw-ring-color': 'var(--color-info)' } as React.CSSProperties}
                                     />
+                                </div>
+                                {/* Icon Upload */}
+                                <div>
+                                    <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-dark-gray)' }}>
+                                        Ikon Kategori
+                                    </label>
+                                    <div className="flex items-center space-x-4">
+                                        {iconPreview ? (
+                                            <div className="relative">
+                                                <div className="w-16 h-16 rounded-xl overflow-hidden border-2 border-gray-200">
+                                                    <img
+                                                        src={iconPreview}
+                                                        alt="Icon preview"
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={removeIcon}
+                                                    className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
+                                                >
+                                                    <X className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="w-16 h-16 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50">
+                                                <ImageIcon className="w-8 h-8 text-gray-400" />
+                                            </div>
+                                        )}
+                                        <div className="flex-1">
+                                            <input
+                                                type="file"
+                                                ref={iconInputRef}
+                                                onChange={handleIconChange}
+                                                accept="image/*"
+                                                className="hidden"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => iconInputRef.current?.click()}
+                                                className="flex items-center space-x-2 px-4 py-2 border rounded-lg hover:bg-gray-50 transition-colors"
+                                                style={{ borderColor: 'rgba(169, 169, 169, 0.4)', color: 'var(--color-dark-gray)' }}
+                                            >
+                                                <Upload className="w-4 h-4" />
+                                                <span className="text-sm">{iconPreview ? 'Ganti Ikon' : 'Unggah Ikon'}</span>
+                                            </button>
+                                            <p className="text-xs mt-1" style={{ color: 'var(--color-gray-custom)' }}>
+                                                Format: JPG, PNG. Maks 2MB
+                                            </p>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div className="flex space-x-3 pt-4">
                                     <button

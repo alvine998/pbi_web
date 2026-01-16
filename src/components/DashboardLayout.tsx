@@ -39,21 +39,19 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         <div className="min-h-screen" style={{ backgroundColor: 'var(--color-secondary)' }}>
             {/* Sidebar */}
             <aside
-                className={`fixed left-0 top-0 h-full text-white transition-all duration-300 ${isSidebarOpen ? 'w-64' : 'w-20'} shadow-2xl z-10`}
+                className={`fixed left-0 top-0 h-full text-white transition-all duration-300 ${isSidebarOpen ? 'w-64' : 'w-20'} shadow-2xl z-10 flex flex-col`}
                 style={{ backgroundColor: 'var(--color-primary)' }}
             >
-                <div className="p-6">
-                    <div className="flex items-center justify-between mb-8">
+                {/* Header */}
+                <div className="p-6 pb-4">
+                    <div className="flex items-center justify-between">
                         <h2 className={`text-2xl font-bold text-center ${!isSidebarOpen && 'hidden'}`}>Dashboard PBI</h2>
-                        {/* <button
-                            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-                        >
-                            {isSidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-                        </button> */}
                     </div>
+                </div>
 
-                    <nav className="space-y-2">
+                {/* Scrollable Navigation */}
+                <div className="flex-1 overflow-y-auto px-6">
+                    <nav className="space-y-2 pb-4">
                         {
                             [
                                 { icon: BarChart3, label: 'Ringkasan', path: '/dashboard' },
@@ -88,7 +86,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     </nav>
                 </div>
 
-                <div className="absolute bottom-6 left-0 right-0 px-6">
+                {/* Logout Button - Fixed at bottom */}
+                <div className="p-6 pt-4 border-t border-white/10">
                     <button
                         onClick={handleLogout}
                         className="w-full flex items-center space-x-3 px-4 py-3 bg-white/10 rounded-xl hover:bg-white/20 transition-all duration-300"
