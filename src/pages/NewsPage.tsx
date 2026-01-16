@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Search, Plus, Edit2, Trash2, X, Calendar, CheckCircle, Clock, Loader2, AlertCircle, Upload, Image as ImageIcon } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, X, Calendar, CheckCircle, Clock, Loader2, AlertCircle, Upload, Eye, Image as ImageIcon } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { showToast } from '../utils/toast';
 import DashboardLayout from '../components/DashboardLayout';
 import Pagination from '../components/Pagination';
@@ -27,6 +28,7 @@ interface FormData {
 }
 
 export default function NewsPage() {
+    const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState('');
     const [categoryFilter, setCategoryFilter] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
@@ -416,6 +418,9 @@ export default function NewsPage() {
                                             <span>{formatDate(article.createdAt)}</span>
                                         </div>
                                         <div className="flex items-center space-x-2">
+                                            <button onClick={() => navigate(`/news/${article.id}`)} className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors" title="Lihat Detail">
+                                                <Eye className="w-4 h-4" />
+                                            </button>
                                             <button onClick={() => openEditModal(article)} className="p-2 bg-yellow-50 text-yellow-600 rounded-lg hover:bg-yellow-100 transition-colors">
                                                 <Edit2 className="w-4 h-4" />
                                             </button>

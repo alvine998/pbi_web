@@ -23,6 +23,7 @@ import NotificationDetailPage from './pages/NotificationDetailPage';
 import NotFoundPage from './pages/NotFoundPage';
 import AspirationsPage from './pages/AspirationsPage';
 import ProductCategoriesPage from './pages/ProductCategoriesPage';
+import NewsDetailPage from './pages/NewsDetailPage';
 
 function App() {
   return (
@@ -50,6 +51,7 @@ function App() {
         <Route path="/chat" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
         <Route path="/activity-log" element={<ProtectedRoute><ActivityLogPage /></ProtectedRoute>} />
         <Route path="/news" element={<ProtectedRoute><NewsPage /></ProtectedRoute>} />
+        <Route path="/news/:id" element={<ProtectedRoute><NewsDetailPage /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
         <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
         <Route path="/notifications/:id" element={<ProtectedRoute><NotificationDetailPage /></ProtectedRoute>} />

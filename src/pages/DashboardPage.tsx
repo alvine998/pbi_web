@@ -1,15 +1,85 @@
-import { BarChart3, TrendingUp, Users, Settings, Bell, User, Plus, FileText } from 'lucide-react';
+import { Users, Settings, Bell, User, Plus, FileText, Package, Newspaper, MessageSquare, Loader2 } from 'lucide-react';
 import { showToast } from '../utils/toast';
 import DashboardLayout from '../components/DashboardLayout';
 import Chart from 'react-apexcharts';
+import { useState, useEffect } from 'react';
+import api from '../utils/api';
 
 export default function DashboardPage() {
-    const stats = [
-        { label: 'Total Pengguna', value: '2,543', change: '+12%', colorVar: 'var(--color-info)' },
-        { label: 'Pendapatan', value: 'Rp 45.231.000', change: '+23%', colorVar: 'var(--color-success)' },
-        { label: 'Proyek Aktif', value: '127', change: '+8%', colorVar: 'var(--color-warning)' },
-        { label: 'Tingkat Konversi', value: '3.24%', change: '+5%', colorVar: 'var(--color-danger)' },
-    ];
+    const [stats, setStats] = useState([
+        { label: 'Total Pengguna', value: '0', change: '', icon: Users, colorVar: 'var(--color-info)' },
+        { label: 'Total Produk', value: '0', change: '', icon: Package, colorVar: 'var(--color-success)' },
+        { label: 'Total Berita', value: '0', change: '', icon: Newspaper, colorVar: 'var(--color-warning)' },
+        { label: 'Diskusi Forum', value: '0', change: '', icon: MessageSquare, colorVar: 'var(--color-danger)' },
+    ]);
+
+    const [activities, setActivities] = useState<any[]>([]);
+    const [isLoadingStats, setIsLoadingStats] = useState(true);
+    const [isLoadingActivities, setIsLoadingActivities] = useState(true);
+
+    useEffect(() => {
+        const fetchStats = async () => {
+            setIsLoadingStats(true);
+            try {
+                const [usersRes, productsRes, newsRes, forumRes] = await Promise.all([
+                    api.get('/users?limit=1'),
+                    api.get('/products?limit=1'),
+                    api.get('/news?limit=1'),
+                    api.get('/forum?limit=1')
+                ]);
+
+                setStats([
+                    { label: 'Total Pengguna', value: usersRes.data.totalItems?.toString() || '0', change: '+0', icon: Users, colorVar: 'var(--color-info)' },
+                    { label: 'Total Produk', value: productsRes.data.totalItems?.toString() || '0', change: '+0', icon: Package, colorVar: 'var(--color-success)' },
+                    { label: 'Total Berita', value: newsRes.data.totalItems?.toString() || '0', change: '+0', icon: Newspaper, colorVar: 'var(--color-warning)' },
+                    { label: 'Diskusi Forum', value: forumRes.data.totalItems?.toString() || '0', change: '+0', icon: MessageSquare, colorVar: 'var(--color-danger)' },
+                ]);
+            } catch (error) {
+                console.error('Error fetching dashboard stats:', error);
+                showToast.error('Gagal memuat statistik dashboard');
+            } finally {
+                setIsLoadingStats(false);
+            }
+        };
+
+        const fetchActivities = async () => {
+            setIsLoadingActivities(true);
+            try {
+                const response = await api.get('/activity-log');
+                const items = response.data.items || [];
+                setActivities(items.slice(0, 5));
+            } catch (error) {
+                console.error('Error fetching activities:', error);
+            } finally {
+                setIsLoadingActivities(false);
+            }
+        };
+
+        fetchStats();
+        fetchActivities();
+    }, []);
+
+    const getActivityIcon = (action: string) => {
+        const a = action.toLowerCase();
+        if (a.includes('user')) return User;
+        if (a.includes('product')) return Package;
+        if (a.includes('news')) return Newspaper;
+        if (a.includes('forum') || a.includes('comment')) return MessageSquare;
+        if (a.includes('login')) return Settings;
+        return Bell;
+    };
+
+    const formatTime = (timestamp: string) => {
+        if (!timestamp) return '';
+        const date = new Date(timestamp);
+        const now = new Date();
+        const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+        if (diffInSeconds < 60) return 'Baru saja';
+        if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} menit yang lalu`;
+        if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} jam yang lalu`;
+        return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+    };
 
     const revenueChartOptions: ApexCharts.ApexOptions = {
         chart: {
@@ -110,10 +180,15 @@ export default function DashboardPage() {
                             key={stat.label}
                             className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all duration-300 hover:scale-[1.02]"
                         >
-                            <div className="w-12 h-12 rounded-xl mb-4" style={{ backgroundColor: stat.colorVar }}></div>
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: stat.colorVar + '20' }}>
+                                    <stat.icon className="w-6 h-6" style={{ color: stat.colorVar }} />
+                                </div>
+                                {isLoadingStats && <Loader2 className="w-4 h-4 animate-spin text-gray-300" />}
+                            </div>
                             <h3 className="text-sm font-medium mb-1" style={{ color: 'var(--color-dark-gray)' }}>{stat.label}</h3>
                             <div className="flex items-end justify-between">
-                                <p className={stat.label.includes("Pendapatan") ? "text-xl font-bold" : "text-3xl font-bold"} style={{ color: 'var(--color-primary)' }}>{stat.value}</p>
+                                <p className="text-3xl font-bold" style={{ color: 'var(--color-primary)' }}>{stat.value}</p>
                                 <span className="text-sm font-semibold" style={{ color: 'var(--color-success)' }}>{stat.change}</span>
                             </div>
                         </div>
@@ -162,27 +237,28 @@ export default function DashboardPage() {
                     <div className="bg-white rounded-2xl shadow-lg p-6">
                         <h2 className="text-xl font-bold mb-4" style={{ color: 'var(--color-primary)' }}>Aktivitas Terbaru</h2>
                         <div className="space-y-4">
-                            {
-                                [
-                                    { action: 'Pengguna baru terdaftar', time: '2 menit yang lalu', icon: User },
-                                    { action: 'Proyek selesai', time: '1 jam yang lalu', icon: BarChart3 },
-                                    { action: 'Pembayaran diterima', time: '3 jam yang lalu', icon: TrendingUp },
-                                    { action: 'Pesan baru', time: '5 jam yang lalu', icon: Bell },
-                                ].map((activity, index) => {
-                                    const Icon = activity.icon;
+                            {isLoadingActivities ? (
+                                <div className="flex justify-center py-8">
+                                    <Loader2 className="w-8 h-8 animate-spin text-gray-300" />
+                                </div>
+                            ) : activities.length === 0 ? (
+                                <p className="text-center py-8 text-gray-400 italic">Tidak ada aktivitas baru</p>
+                            ) : (
+                                activities.map((activity, index) => {
+                                    const Icon = getActivityIcon(activity.action);
                                     return (
                                         <div key={index} className="flex items-center space-x-4 p-3 rounded-lg transition-colors hover:bg-gray-50/50">
                                             <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: 'var(--color-info)', opacity: 0.1 }}>
                                                 <Icon className="w-5 h-5" style={{ color: 'var(--color-info)' }} />
                                             </div>
                                             <div className="flex-1">
-                                                <p className="font-medium" style={{ color: 'var(--color-dark-gray)' }}>{activity.action}</p>
-                                                <p className="text-sm" style={{ color: 'var(--color-gray-custom)' }}>{activity.time}</p>
+                                                <p className="font-medium" style={{ color: 'var(--color-dark-gray)' }}>{activity.action} - <span className="font-bold">{activity.target}</span></p>
+                                                <p className="text-xs" style={{ color: 'var(--color-gray-custom)' }}>oleh {activity.user} • {formatTime(activity.timestamp)}</p>
                                             </div>
                                         </div>
                                     );
                                 })
-                            }
+                            )}
                         </div>
                     </div>
 

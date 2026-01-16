@@ -1,60 +1,142 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Phone, MapPin, Calendar, Shield, User, Edit3, Camera, Activity, X, Lock, Eye, EyeOff } from 'lucide-react';
+import { Mail, Phone, MapPin, Shield, User, Edit3, Camera, Activity, X, Lock, Eye, EyeOff } from 'lucide-react';
 import { showToast } from '../utils/toast';
 import DashboardLayout from '../components/DashboardLayout';
+import { useAuth } from '../contexts/AuthContext';
+import api from '../utils/api';
 
 export default function ProfilePage() {
     const navigate = useNavigate();
+    const { user, updateUser } = useAuth();
+
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
     const [showPasswords, setShowPasswords] = useState({ old: false, new: false, confirm: false });
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // Mock data for the current user
-    const [user, setUser] = useState({
-        name: 'Alvin Yoga',
-        email: 'alvineyoga@example.com',
-        phone: '+62 812-3456-7890',
-        address: 'Jl. Kemang Raya No. 45, Jakarta Selatan, DKI Jakarta',
-        dateOfBirth: '20 Mei 1995',
-        joinDate: '15 September 2023',
-        role: 'Super Admin',
-        avatar: 'AY'
-    });
-
+    // Form states
     const [editForm, setEditForm] = useState({
-        name: user.name,
-        phone: user.phone,
-        address: user.address
+        name: '',
+        email: '',
+        phone: '',
+        address: ''
     });
 
     const [passwordForm, setPasswordForm] = useState({
-        oldPassword: '',
+        currentPassword: '',
         newPassword: '',
         confirmPassword: ''
     });
 
-    const handleEditSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        setUser({ ...user, ...editForm });
-        setIsEditModalOpen(false);
-        showToast.success('Profil berhasil diperbaharui!');
-    };
+    // Avatar upload states
+    const [avatarFile, setAvatarFile] = useState<File | null>(null);
+    const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+    const avatarInputRef = useRef<HTMLInputElement>(null);
 
-    const handlePasswordSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-            showToast.error('Password baru tidak cocok!');
+    useEffect(() => {
+        if (user) {
+            setEditForm({
+                name: user.name || '',
+                email: user.email || '',
+                phone: (user as any).phone || '',
+                address: (user as any).address || ''
+            });
+            setAvatarPreview((user as any).avatar || null);
+        }
+    }, [user]);
+
+    const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (file.size > 2 * 1024 * 1024) {
+            showToast.error('Ukuran avatar maksimal 2MB');
             return;
         }
+
+        setAvatarFile(file);
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setAvatarPreview(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const handleEditSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsSubmitting(true);
+        const loadingToast = showToast.loading('Memperbarui profil...');
+
+        try {
+            const formData = new FormData();
+            formData.append('name', editForm.name);
+            formData.append('email', editForm.email);
+            formData.append('phone', editForm.phone);
+            // address is not in docs but I'll add if it exists or user wants it
+            // formData.append('address', editForm.address); 
+
+            if (avatarFile) {
+                formData.append('avatar', avatarFile);
+            }
+
+            const response = await api.put('/auth/profile', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+
+            const updatedUser = response.data.data || response.data;
+            updateUser({
+                ...user!,
+                ...updatedUser
+            });
+
+            showToast.dismiss(loadingToast);
+            showToast.success('Profil berhasil diperbaharui!');
+            setIsEditModalOpen(false);
+            setAvatarFile(null);
+        } catch (err: any) {
+            showToast.dismiss(loadingToast);
+            showToast.error(err.response?.data?.message || 'Gagal memperbarui profil');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handlePasswordSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+            showToast.error('Konfirmasi password tidak cocok!');
+            return;
+        }
+
         if (passwordForm.newPassword.length < 6) {
             showToast.error('Password minimal 6 karakter!');
             return;
         }
-        showToast.success('Password berhasil diubah!');
-        setIsPasswordModalOpen(false);
-        setPasswordForm({ oldPassword: '', newPassword: '', confirmPassword: '' });
+
+        setIsSubmitting(true);
+        const loadingToast = showToast.loading('Mengubah password...');
+
+        try {
+            await api.post('/auth/change-password', {
+                currentPassword: passwordForm.currentPassword,
+                newPassword: passwordForm.newPassword
+            });
+
+            showToast.dismiss(loadingToast);
+            showToast.success('Password berhasil diubah!');
+            setIsPasswordModalOpen(false);
+            setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+        } catch (err: any) {
+            showToast.dismiss(loadingToast);
+            showToast.error(err.response?.data?.message || 'Gagal mengubah password');
+        } finally {
+            setIsSubmitting(false);
+        }
     };
+
+    if (!user) return null;
 
     return (
         <DashboardLayout>
@@ -67,15 +149,29 @@ export default function ProfilePage() {
                             <div className="flex items-end space-x-6">
                                 <div className="relative group">
                                     <div className="w-32 h-32 rounded-3xl border-4 border-white shadow-lg overflow-hidden flex items-center justify-center text-white text-4xl font-bold transition-transform group-hover:scale-105" style={{ backgroundColor: 'var(--color-info)' }}>
-                                        {user.avatar}
+                                        {avatarPreview ? (
+                                            <img src={avatarPreview} alt={user.name} className="w-full h-full object-cover" />
+                                        ) : (
+                                            user.name.charAt(0).toUpperCase()
+                                        )}
                                     </div>
-                                    <button className="absolute bottom-2 right-2 p-2 bg-white rounded-xl shadow-md text-blue-500 hover:bg-blue-50 transition-colors">
+                                    <input
+                                        type="file"
+                                        ref={avatarInputRef}
+                                        className="hidden"
+                                        accept="image/*"
+                                        onChange={handleAvatarChange}
+                                    />
+                                    <button
+                                        onClick={() => avatarInputRef.current?.click()}
+                                        className="absolute bottom-2 right-2 p-2 bg-white rounded-xl shadow-md text-blue-500 hover:bg-blue-50 transition-colors"
+                                    >
                                         <Camera className="w-5 h-5" />
                                     </button>
                                 </div>
                                 <div className="pb-2">
                                     <h1 className="text-3xl font-bold" style={{ color: 'var(--color-primary)' }}>{user.name}</h1>
-                                    <p className="text-gray-500 font-medium">{user.role}</p>
+                                    <p className="text-gray-500 font-medium">{user.role || 'User'}</p>
                                 </div>
                             </div>
                             <button
@@ -113,25 +209,16 @@ export default function ProfilePage() {
                                     </div>
                                     <div>
                                         <p className="text-sm font-semibold text-gray-400 mb-1">Telepon</p>
-                                        <p className="font-bold text-gray-700">{user.phone}</p>
+                                        <p className="font-bold text-gray-700">{(user as any).phone || '-'}</p>
                                     </div>
                                 </div>
                                 <div className="flex items-start space-x-4">
                                     <div className="p-3 bg-blue-50 rounded-2xl">
-                                        <Calendar className="w-6 h-6 text-blue-500" />
+                                        <Shield className="w-6 h-6 text-blue-500" />
                                     </div>
                                     <div>
-                                        <p className="text-sm font-semibold text-gray-400 mb-1">Tanggal Lahir</p>
-                                        <p className="font-bold text-gray-700">{user.dateOfBirth}</p>
-                                    </div>
-                                </div>
-                                <div className="flex items-start space-x-4">
-                                    <div className="p-3 bg-blue-50 rounded-2xl">
-                                        <Calendar className="w-6 h-6 text-blue-500" />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-semibold text-gray-400 mb-1">Bergabung Sejak</p>
-                                        <p className="font-bold text-gray-700">{user.joinDate}</p>
+                                        <p className="text-sm font-semibold text-gray-400 mb-1">Role</p>
+                                        <p className="font-bold text-gray-700">{user.role || 'User'}</p>
                                     </div>
                                 </div>
                                 <div className="flex items-start space-x-4 md:col-span-2">
@@ -140,7 +227,7 @@ export default function ProfilePage() {
                                     </div>
                                     <div>
                                         <p className="text-sm font-semibold text-gray-400 mb-1">Alamat</p>
-                                        <p className="font-bold text-gray-700">{user.address}</p>
+                                        <p className="font-bold text-gray-700">{(user as any).address || '-'}</p>
                                     </div>
                                 </div>
                             </div>
@@ -158,11 +245,11 @@ export default function ProfilePage() {
                                 >
                                     <div className="flex items-center space-x-4">
                                         <div className="p-2 bg-gray-50 rounded-xl group-hover:bg-blue-50 transition-colors">
-                                            <Shield className="w-5 h-5 text-gray-400 group-hover:text-blue-500" />
+                                            <Lock className="w-5 h-5 text-gray-400 group-hover:text-blue-500" />
                                         </div>
                                         <div>
                                             <p className="font-bold text-gray-700">Ubah Password</p>
-                                            <p className="text-sm text-gray-400">Terakhir diubah 3 bulan yang lalu</p>
+                                            <p className="text-sm text-gray-400">Pastikan password Anda aman dan unik</p>
                                         </div>
                                     </div>
                                     <div className="text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -173,14 +260,14 @@ export default function ProfilePage() {
                         </div>
                     </div>
 
-                    {/* Right Column: Experience/Stats */}
+                    {/* Right Column: Activity */}
                     <div className="space-y-8">
                         <div className="bg-white rounded-3xl shadow-lg p-8 text-center">
                             <div className="w-20 h-20 bg-blue-50 rounded-3xl flex items-center justify-center mx-auto mb-4">
                                 <Activity className="w-10 h-10 text-blue-500" />
                             </div>
-                            <h3 className="text-lg font-bold text-gray-700 mb-2">Aktivitas Login</h3>
-                            <p className="text-sm text-gray-400 mb-6">Anda telah login dari 3 perangkat yang berbeda bulan ini.</p>
+                            <h3 className="text-lg font-bold text-gray-700 mb-2">Aktivitas Saya</h3>
+                            <p className="text-sm text-gray-400 mb-6">Pantau aktivitas login dan perubahan akun Anda.</p>
                             <button
                                 onClick={() => navigate('/activity-log')}
                                 className="w-full py-3 bg-gray-50 text-blue-500 font-bold rounded-2xl hover:bg-blue-50 transition-colors"
@@ -222,12 +309,25 @@ export default function ProfilePage() {
                                 </div>
                             </div>
                             <div className="space-y-2">
+                                <label className="text-sm font-bold text-gray-600 ml-1">Email</label>
+                                <div className="relative">
+                                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                    <input
+                                        type="email"
+                                        required
+                                        className="w-full pl-12 pr-4 py-3 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 transition-all font-medium"
+                                        value={editForm.email}
+                                        onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                                        placeholder="Masukkan email"
+                                    />
+                                </div>
+                            </div>
+                            <div className="space-y-2">
                                 <label className="text-sm font-bold text-gray-600 ml-1">Nomor Telepon</label>
                                 <div className="relative">
                                     <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                                     <input
                                         type="tel"
-                                        required
                                         className="w-full pl-12 pr-4 py-3 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 transition-all font-medium"
                                         value={editForm.phone}
                                         onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
@@ -241,7 +341,6 @@ export default function ProfilePage() {
                                     <MapPin className="absolute left-4 top-4 w-5 h-5 text-gray-400" />
                                     <textarea
                                         rows={3}
-                                        required
                                         className="w-full pl-12 pr-4 py-3 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 transition-all font-medium resize-none"
                                         value={editForm.address}
                                         onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
@@ -259,9 +358,10 @@ export default function ProfilePage() {
                                 </button>
                                 <button
                                     type="submit"
-                                    className="flex-1 py-4 bg-blue-500 text-white font-bold rounded-2xl shadow-lg shadow-blue-100 hover:bg-blue-600 hover:scale-[1.02] active:scale-95 transition-all"
+                                    disabled={isSubmitting}
+                                    className="flex-1 py-4 bg-blue-500 text-white font-bold rounded-2xl shadow-lg shadow-blue-100 hover:bg-blue-600 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50"
                                 >
-                                    Simpan Perubahan
+                                    {isSubmitting ? 'Menyimpan...' : 'Simpan Perubahan'}
                                 </button>
                             </div>
                         </form>
@@ -292,8 +392,8 @@ export default function ProfilePage() {
                                         type={showPasswords.old ? "text" : "password"}
                                         required
                                         className="w-full pl-12 pr-12 py-3 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-green-500 transition-all font-medium"
-                                        value={passwordForm.oldPassword}
-                                        onChange={(e) => setPasswordForm({ ...passwordForm, oldPassword: e.target.value })}
+                                        value={passwordForm.currentPassword}
+                                        onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
                                         placeholder="••••••••"
                                     />
                                     <button
@@ -357,9 +457,10 @@ export default function ProfilePage() {
                                 </button>
                                 <button
                                     type="submit"
-                                    className="flex-1 py-4 bg-green-500 text-white font-bold rounded-2xl shadow-lg shadow-green-100 hover:bg-green-600 hover:scale-[1.02] active:scale-95 transition-all"
+                                    disabled={isSubmitting}
+                                    className="flex-1 py-4 bg-green-500 text-white font-bold rounded-2xl shadow-lg shadow-green-100 hover:bg-green-600 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50"
                                 >
-                                    Update Password
+                                    {isSubmitting ? 'Memproses...' : 'Update Password'}
                                 </button>
                             </div>
                         </form>
@@ -369,4 +470,3 @@ export default function ProfilePage() {
         </DashboardLayout>
     );
 }
-

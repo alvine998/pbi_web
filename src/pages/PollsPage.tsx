@@ -1,8 +1,9 @@
-import { useState } from 'react';
-import { Search, Plus, Edit2, Trash2, X, Vote, Calendar, Clock, AlertCircle } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Search, Plus, Edit2, Trash2, X, Vote, Calendar, Clock, AlertCircle, Loader2 } from 'lucide-react';
 import { showToast } from '../utils/toast';
 import DashboardLayout from '../components/DashboardLayout';
 import Pagination from '../components/Pagination';
+import api from '../utils/api';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -23,6 +24,7 @@ interface Poll {
 
 export default function PollsPage() {
     const [searchQuery, setSearchQuery] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [editingPoll, setEditingPoll] = useState<Poll | null>(null);
     const [formData, setFormData] = useState({
@@ -31,107 +33,55 @@ export default function PollsPage() {
         options: ['', '']
     });
 
-    const [polls, setPolls] = useState<Poll[]>([
-        {
-            id: 1,
-            question: 'Apa fitur paling penting di dashboard PBI?',
-            options: [
-                { id: 1, text: 'Monitoring Produk', votes: 45 },
-                { id: 2, text: 'Manajemen Event', votes: 12 },
-                { id: 3, text: 'Forum Diskusi', votes: 28 },
-                { id: 4, text: 'Polling Survey', votes: 35 }
-            ],
-            totalVotes: 120,
-            endDate: '2024-01-30',
-            status: 'Active'
-        },
-        {
-            id: 2,
-            question: 'Seberapa puas Anda dengan tampilan UI baru?',
-            options: [
-                { id: 1, text: 'Sangat Puas', votes: 89 },
-                { id: 2, text: 'Puas', votes: 45 },
-                { id: 3, text: 'Cukup', votes: 12 },
-                { id: 4, text: 'Kurang Puas', votes: 5 }
-            ],
-            totalVotes: 151,
-            endDate: '2024-02-15',
-            status: 'Active'
-        },
-        {
-            id: 3,
-            question: 'Pilih lokasi gathering tahunan selanjutnya',
-            options: [
-                { id: 1, text: 'Bali', votes: 120 },
-                { id: 2, text: 'Lombok', votes: 85 },
-                { id: 3, text: 'Yogyakarta', votes: 95 }
-            ],
-            totalVotes: 300,
-            endDate: '2023-12-31',
-            status: 'Ended'
-        },
-        {
-            id: 4,
-            question: 'Bahasa pemrograman favorit untuk backend?',
-            options: [
-                { id: 1, text: 'Node.js', votes: 150 },
-                { id: 2, text: 'Python', votes: 120 },
-                { id: 3, text: 'Go', votes: 90 },
-                { id: 4, text: 'PHP', votes: 60 }
-            ],
-            totalVotes: 420,
-            endDate: '2024-03-01',
-            status: 'Active'
-        },
-        {
-            id: 5,
-            question: 'Apakah Anda setuju dengan kebijakan WFA?',
-            options: [
-                { id: 1, text: 'Setuju', votes: 200 },
-                { id: 2, text: 'Tidak Setuju', votes: 20 },
-                { id: 3, text: 'Ragu-ragu', votes: 30 }
-            ],
-            totalVotes: 250,
-            endDate: '2024-04-01',
-            status: 'Active'
-        },
-        {
-            id: 6,
-            question: 'Jenis konten apa yang ingin Anda lihat lebih banyak?',
-            options: [
-                { id: 1, text: 'Video Tutorial', votes: 75 },
-                { id: 2, text: 'Artikel Teknis', votes: 45 },
-                { id: 3, text: 'Webinar', votes: 30 }
-            ],
-            totalVotes: 150,
-            endDate: '2024-05-01',
-            status: 'Active'
-        },
-        {
-            id: 7,
-            question: 'Transportasi utama saat berangkat kerja?',
-            options: [
-                { id: 1, text: 'Ojek Online', votes: 80 },
-                { id: 2, text: 'Kendaraan Pribadi', votes: 70 },
-                { id: 3, text: 'Transportasi Umum', votes: 100 }
-            ],
-            totalVotes: 250,
-            endDate: '2024-01-10',
-            status: 'Ended'
+    const [polls, setPolls] = useState<Poll[]>([]);
+    const [totalItems, setTotalItems] = useState(0);
+    const [totalPages, setTotalPages] = useState(0);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const fetchPolls = useCallback(async () => {
+        setIsLoading(true);
+        setIsLoading(true);
+
+        try {
+            const params = new URLSearchParams();
+            params.append('page', currentPage.toString());
+            params.append('limit', ITEMS_PER_PAGE.toString());
+            if (searchQuery) params.append('search', searchQuery);
+
+            const response = await api.get(`/polls?${params.toString()}`);
+            const data = response.data;
+
+            console.log('Polls API response:', data);
+
+            if (data.items) {
+                setPolls(data.items);
+                setTotalItems(data.totalItems || data.items.length);
+                setTotalPages(data.totalPages || Math.ceil((data.totalItems || data.items.length) / ITEMS_PER_PAGE));
+            } else if (Array.isArray(data)) {
+                setPolls(data);
+                setTotalItems(data.length);
+                setTotalPages(Math.ceil(data.length / ITEMS_PER_PAGE));
+            } else if (data.data) {
+                setPolls(Array.isArray(data.data) ? data.data : []);
+                setTotalItems(data.total || data.data.length);
+                setTotalPages(data.totalPages || Math.ceil(data.total / ITEMS_PER_PAGE));
+            } else {
+                setPolls([]);
+                setTotalItems(0);
+                setTotalPages(0);
+            }
+        } catch (err: any) {
+            console.error('Error fetching polls:', err);
+            setPolls([]);
+        } finally {
+            setIsLoading(false);
         }
-    ]);
+    }, [currentPage, searchQuery]);
 
-    const [currentPage, setCurrentPage] = useState(1);
-
-    const filteredPolls = polls.filter(poll =>
-        poll.question.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
-    const totalPages = Math.ceil(filteredPolls.length / ITEMS_PER_PAGE);
-    const paginatedPolls = filteredPolls.slice(
-        (currentPage - 1) * ITEMS_PER_PAGE,
-        currentPage * ITEMS_PER_PAGE
-    );
+    useEffect(() => {
+        fetchPolls();
+    }, [fetchPolls]);
 
     const handlePageChange = (page: number) => {
         setCurrentPage(page);
@@ -155,54 +105,56 @@ export default function PollsPage() {
         setFormData({ ...formData, options: newOptions });
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setIsSubmitting(true);
+        const loadingToast = showToast.loading(editingPoll ? 'Menyimpan perubahan...' : 'Membuat polling...');
 
-        if (editingPoll) {
-            const updatedPolls = polls.map(p => {
-                if (p.id === editingPoll.id) {
-                    const newOptions = formData.options.map((opt, idx) => {
-                        const existingOpt = p.options[idx];
-                        return {
-                            id: existingOpt ? existingOpt.id : idx + 1,
-                            text: opt,
-                            votes: existingOpt ? existingOpt.votes : 0
-                        };
-                    });
-                    return {
-                        ...p,
-                        question: formData.question,
-                        endDate: formData.endDate,
-                        options: newOptions,
-                        status: new Date(formData.endDate) < new Date() ? 'Ended' : 'Active' as 'Ended' | 'Active'
-                    };
-                }
-                return p;
-            });
-            setPolls(updatedPolls);
-            showToast.success('Polling berhasil diupdate!');
-        } else {
-            const newPoll: Poll = {
-                id: Math.max(...polls.map(p => p.id), 0) + 1,
+        try {
+            const payload = {
                 question: formData.question,
-                endDate: formData.endDate,
-                options: formData.options.map((text, idx) => ({ id: idx + 1, text, votes: 0 })),
-                totalVotes: 0,
-                status: new Date(formData.endDate) < new Date() ? 'Ended' : 'Active'
+                options: formData.options.map(text => ({ text })),
+                endDate: formData.endDate
             };
-            setPolls([newPoll, ...polls]);
-            showToast.success('Polling baru berhasil dibuat!');
-        }
 
-        setIsAddModalOpen(false);
-        setEditingPoll(null);
-        setFormData({ question: '', endDate: '', options: ['', ''] });
+            if (editingPoll) {
+                await api.put(`/polls/${editingPoll.id}`, payload);
+                showToast.dismiss(loadingToast);
+                showToast.success('Polling berhasil diupdate!');
+            } else {
+                await api.post('/polls', payload);
+                showToast.dismiss(loadingToast);
+                showToast.success('Polling baru berhasil dibuat!');
+            }
+
+            setIsAddModalOpen(false);
+            setEditingPoll(null);
+            setFormData({ question: '', endDate: '', options: ['', ''] });
+            fetchPolls();
+        } catch (err: any) {
+            showToast.dismiss(loadingToast);
+            showToast.error(err.response?.data?.message || 'Gagal menyimpan polling');
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
-    const handleDelete = (id: number) => {
-        if (window.confirm('Apakah Anda yakin ingin menghapus polling ini?')) {
-            setPolls(polls.filter(p => p.id !== id));
+    const handleDelete = async (id: number) => {
+        if (!window.confirm('Apakah Anda yakin ingin menghapus polling ini?')) return;
+
+        setIsSubmitting(true);
+        const loadingToast = showToast.loading('Menghapus polling...');
+
+        try {
+            await api.delete(`/polls/${id}`);
+            showToast.dismiss(loadingToast);
             showToast.success('Polling berhasil dihapus');
+            fetchPolls();
+        } catch (err: any) {
+            showToast.dismiss(loadingToast);
+            showToast.error(err.response?.data?.message || 'Gagal menghapus polling');
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -210,7 +162,7 @@ export default function PollsPage() {
         setEditingPoll(poll);
         setFormData({
             question: poll.question,
-            endDate: poll.endDate,
+            endDate: poll.endDate ? poll.endDate.split('T')[0] : '',
             options: poll.options.map(o => o.text)
         });
         setIsAddModalOpen(true);
@@ -267,81 +219,88 @@ export default function PollsPage() {
                 </div>
 
                 {/* Polls Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {paginatedPolls.map((poll) => (
-                        <div key={poll.id} className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all duration-300 flex flex-col">
-                            <div className="flex items-start justify-between mb-4">
-                                <span className={`px-3 py-1 rounded-full text-xs font-bold ${poll.status === 'Active' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
-                                    {poll.status}
-                                </span>
-                                <div className="flex items-center space-x-2">
-                                    <button onClick={() => handleEdit(poll)} className="p-2 rounded-lg hover:bg-yellow-50 transition-colors" title="Edit">
-                                        <Edit2 className="w-4 h-4 text-yellow-500" />
-                                    </button>
-                                    <button onClick={() => handleDelete(poll.id)} className="p-2 rounded-lg hover:bg-red-50 transition-colors" title="Hapus">
-                                        <Trash2 className="w-4 h-4 text-red-500" />
-                                    </button>
-                                </div>
-                            </div>
-
-                            <h3 className="text-xl font-bold mb-6 flex-1" style={{ color: 'var(--color-primary)' }}>{poll.question}</h3>
-
-                            <div className="space-y-4 mb-6">
-                                {poll.options.map((option) => (
-                                    <div key={option.id}>
-                                        <div className="flex items-center justify-between mb-1">
-                                            <span className="text-sm font-medium" style={{ color: 'var(--color-dark-gray)' }}>{option.text}</span>
-                                            <span className="text-sm font-bold" style={{ color: 'var(--color-primary)' }}>{option.votes} ({Math.round(getProgress(option.votes, poll.totalVotes))}%)</span>
-                                        </div>
-                                        <div className="w-full h-2 rounded-full" style={{ backgroundColor: 'var(--color-secondary)' }}>
-                                            <div
-                                                className="h-2 rounded-full transition-all duration-500"
-                                                style={{
-                                                    width: `${getProgress(option.votes, poll.totalVotes)}%`,
-                                                    backgroundColor: 'var(--color-info)'
-                                                }}
-                                            ></div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-
-                            <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
-                                <div className="flex items-center space-x-4 text-sm" style={{ color: 'var(--color-gray-custom)' }}>
-                                    <div className="flex items-center space-x-1">
-                                        <Vote className="w-4 h-4" />
-                                        <span>{poll.totalVotes} Total Suara</span>
-                                    </div>
-                                    <div className="flex items-center space-x-1">
-                                        <Calendar className="w-4 h-4" />
-                                        <span>Ends: {poll.endDate}</span>
+                {isLoading ? (
+                    <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl shadow-lg">
+                        <Loader2 className="w-12 h-12 animate-spin text-blue-500 mb-4" />
+                        <p className="text-gray-400">Memuat polling...</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {polls.map((poll) => (
+                            <div key={poll.id} className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all duration-300 flex flex-col">
+                                <div className="flex items-start justify-between mb-4">
+                                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${poll.status === 'Active' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                                        {poll.status}
+                                    </span>
+                                    <div className="flex items-center space-x-2">
+                                        <button onClick={() => handleEdit(poll)} className="p-2 rounded-lg hover:bg-yellow-50 transition-colors" title="Edit">
+                                            <Edit2 className="w-4 h-4 text-yellow-500" />
+                                        </button>
+                                        <button onClick={() => handleDelete(poll.id)} className="p-2 rounded-lg hover:bg-red-50 transition-colors" title="Hapus">
+                                            <Trash2 className="w-4 h-4 text-red-500" />
+                                        </button>
                                     </div>
                                 </div>
-                                {poll.status === 'Active' && (
-                                    <div className="flex items-center space-x-1 text-xs text-green-600 font-medium">
-                                        <Clock className="w-3 h-3" />
-                                        <span>Berlangsung</span>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    ))}
 
-                    {paginatedPolls.length === 0 && (
-                        <div className="col-span-full bg-white rounded-2xl shadow-lg p-12 text-center">
-                            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <AlertCircle className="w-8 h-8 text-gray-400" />
+                                <h3 className="text-xl font-bold mb-6 flex-1" style={{ color: 'var(--color-primary)' }}>{poll.question}</h3>
+
+                                <div className="space-y-4 mb-6">
+                                    {poll.options.map((option) => (
+                                        <div key={option.id}>
+                                            <div className="flex items-center justify-between mb-1">
+                                                <span className="text-sm font-medium" style={{ color: 'var(--color-dark-gray)' }}>{option.text}</span>
+                                                <span className="text-sm font-bold" style={{ color: 'var(--color-primary)' }}>{option.votes} ({Math.round(getProgress(option.votes, poll.totalVotes))}%)</span>
+                                            </div>
+                                            <div className="w-full h-2 rounded-full" style={{ backgroundColor: 'var(--color-secondary)' }}>
+                                                <div
+                                                    className="h-2 rounded-full transition-all duration-500"
+                                                    style={{
+                                                        width: `${getProgress(option.votes, poll.totalVotes)}%`,
+                                                        backgroundColor: 'var(--color-info)'
+                                                    }}
+                                                ></div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
+                                    <div className="flex items-center space-x-4 text-sm" style={{ color: 'var(--color-gray-custom)' }}>
+                                        <div className="flex items-center space-x-1">
+                                            <Vote className="w-4 h-4" />
+                                            <span>{poll.totalVotes} Total Suara</span>
+                                        </div>
+                                        <div className="flex items-center space-x-1">
+                                            <Calendar className="w-4 h-4" />
+                                            <span>Ends: {poll.endDate ? new Date(poll.endDate).toLocaleDateString('id-ID') : '-'}</span>
+                                        </div>
+                                    </div>
+                                    {poll.status === 'Active' && (
+                                        <div className="flex items-center space-x-1 text-xs text-green-600 font-medium">
+                                            <Clock className="w-3 h-3" />
+                                            <span>Berlangsung</span>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
-                            <p className="text-gray-400">Tidak ada survey polling ditemukan</p>
-                        </div>
-                    )}
-                </div>
+                        ))}
+
+                        {polls.length === 0 && (
+                            <div className="col-span-full bg-white rounded-2xl shadow-lg p-12 text-center">
+                                <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <AlertCircle className="w-8 h-8 text-gray-400" />
+                                </div>
+                                <p className="text-gray-400">Tidak ada survey polling ditemukan</p>
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 <Pagination
                     currentPage={currentPage}
                     totalPages={totalPages}
                     onPageChange={handlePageChange}
-                    totalItems={filteredPolls.length}
+                    totalItems={totalItems}
                     itemsPerPage={ITEMS_PER_PAGE}
                 />
 
@@ -436,10 +395,11 @@ export default function PollsPage() {
                                         </button>
                                         <button
                                             type="submit"
-                                            className="flex-1 px-4 py-3 rounded-xl text-white font-bold hover:opacity-90 transition-opacity"
+                                            disabled={isSubmitting}
+                                            className="flex-1 px-4 py-3 rounded-xl text-white font-bold hover:opacity-90 transition-opacity disabled:opacity-50"
                                             style={{ backgroundColor: 'var(--color-primary)' }}
                                         >
-                                            {editingPoll ? 'Simpan Perubahan' : 'Buat Polling'}
+                                            {isSubmitting ? 'Menyimpan...' : editingPoll ? 'Simpan Perubahan' : 'Buat Polling'}
                                         </button>
                                     </div>
                                 </form>

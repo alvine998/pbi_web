@@ -1,53 +1,85 @@
-import { useState } from 'react';
-import { Search, Heart, Eye, Trash2, Clock, X, MessageSquare } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Search, Heart, Eye, Trash2, Clock, X, MessageSquare, Loader2 } from 'lucide-react';
 import { showToast } from '../utils/toast';
 import DashboardLayout from '../components/DashboardLayout';
 import Pagination from '../components/Pagination';
+import api from '../utils/api';
 
 interface Aspiration {
     id: number;
     userName: string;
-    userEmail: string;
+    userEmail?: string;
     category: string;
     content: string;
     date: string;
     status: 'Pending' | 'Diproses' | 'Selesai';
+    createdAt?: string;
 }
+
+const ITEMS_PER_PAGE = 10;
 
 export default function AspirationsPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<'All' | 'Pending' | 'Diproses' | 'Selesai'>('All');
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedAspiration, setSelectedAspiration] = useState<Aspiration | null>(null);
-    const itemsPerPage = 10;
 
-    // Mock data for aspirations
-    const [aspirations, setAspirations] = useState<Aspiration[]>([
-        { id: 1, userName: 'Agus Setiawan', userEmail: 'agus.s@example.com', category: 'Infrastruktur', content: 'Mohon perbaikan jalan di area blok C yang sudah mulai berlubang cukup parah.', date: '7 Jan 2026', status: 'Pending' },
-        { id: 2, userName: 'Siti Rahma', userEmail: 'siti.r@example.com', category: 'Layanan', content: 'Proses verifikasi dokumen di kantor pusat mohon dipercepat, sudah menunggu 3 hari.', date: '6 Jan 2026', status: 'Diproses' },
-        { id: 3, userName: 'Bambang Utomo', userEmail: 'bambang.u@example.com', category: 'Umum', content: 'Terima kasih atas diadakannya event musik minggu lalu, sangat menghibur masyarakat.', date: '5 Jan 2026', status: 'Selesai' },
-        { id: 4, userName: 'Dewi Lestari', userEmail: 'dewi.l@example.com', category: 'Keamanan', content: 'Mohon penambahan lampu jalan di gang arah Musholla, kalau malam sangat gelap.', date: '5 Jan 2026', status: 'Pending' },
-        { id: 5, userName: 'Eko Prasetyo', userEmail: 'eko.p@example.com', category: 'Infrastruktur', content: 'Saluran air di depan rumah saya mampet, takut banjir kalau hujan deras.', date: '4 Jan 2026', status: 'Diproses' },
-        { id: 6, userName: 'Fitri Handayani', userEmail: 'fitri.h@example.com', category: 'Sosial', content: 'Saran untuk mengadakan kerja bakti bulanan agar lingkungan tetap asri.', date: '3 Jan 2026', status: 'Selesai' },
-        { id: 7, userName: 'Guntur Mahendra', userEmail: 'guntur.m@example.com', category: 'Layanan', content: 'Aplikasi PBI sering logout sendiri saat digunakan, mohon bantuannya.', date: '2 Jan 2026', status: 'Pending' },
-        { id: 8, userName: 'Hesti Purwanti', userEmail: 'hesti.p@example.com', category: 'Umum', content: 'Ingin mengusulkan pengadaan tong sampah di area taman bermain anak.', date: '1 Jan 2026', status: 'Pending' },
-        { id: 9, userName: 'Indra Wijaya', userEmail: 'indra.w@example.com', category: 'Infrastruktur', content: 'Trotoar di depan ruko banyak yang pecah, membahayakan pejalan kaki.', date: '31 Des 2025', status: 'Diproses' },
-        { id: 10, userName: 'Joko Susilo', userEmail: 'joko.s@example.com', category: 'Layanan', content: 'CS di WA responsnya lambat sekali hari ini.', date: '30 Des 2025', status: 'Selesai' },
-        { id: 11, userName: 'Kurnia Sari', userEmail: 'kurnia.s@example.com', category: 'Sosial', content: 'Bantuan sosial untuk warga terdampak kebakaran kemarin apakah sudah didata?', date: '29 Des 2025', status: 'Pending' },
-    ]);
+    const [aspirations, setAspirations] = useState<Aspiration[]>([]);
+    const [totalItems, setTotalItems] = useState(0);
+    const [totalPages, setTotalPages] = useState(0);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const filteredAspirations = aspirations.filter(asp => {
-        const matchesSearch = asp.userName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            asp.content.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesFilter = statusFilter === 'All' || asp.status === statusFilter;
-        return matchesSearch && matchesFilter;
-    });
+    const fetchAspirations = useCallback(async () => {
+        setIsLoading(true);
+        setIsLoading(true);
 
-    const totalPages = Math.ceil(filteredAspirations.length / itemsPerPage);
-    const paginatedAspirations = filteredAspirations.slice(
-        (currentPage - 1) * itemsPerPage,
-        currentPage * itemsPerPage
-    );
+        try {
+            const params = new URLSearchParams();
+            params.append('page', currentPage.toString());
+            params.append('limit', ITEMS_PER_PAGE.toString());
+
+            if (searchQuery) params.append('search', searchQuery);
+            if (statusFilter !== 'All') params.append('status', statusFilter);
+
+            const response = await api.get(`/aspirations?${params.toString()}`);
+            const data = response.data;
+
+            console.log('Aspirations API response:', data);
+
+            if (data.items) {
+                setAspirations(data.items);
+                setTotalItems(data.totalItems || data.items.length);
+                setTotalPages(data.totalPages || Math.ceil((data.totalItems || data.items.length) / ITEMS_PER_PAGE));
+            } else if (Array.isArray(data)) {
+                setAspirations(data);
+                setTotalItems(data.length);
+                setTotalPages(Math.ceil(data.length / ITEMS_PER_PAGE));
+            } else if (data.data) {
+                setAspirations(Array.isArray(data.data) ? data.data : []);
+                setTotalItems(data.total || data.data.length);
+                setTotalPages(data.totalPages || Math.ceil(data.total / ITEMS_PER_PAGE));
+            } else {
+                setAspirations([]);
+                setTotalItems(0);
+                setTotalPages(0);
+            }
+        } catch (err: any) {
+            console.error('Error fetching aspirations:', err);
+            setAspirations([]);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [currentPage, searchQuery, statusFilter]);
+
+    useEffect(() => {
+        fetchAspirations();
+    }, [fetchAspirations]);
+
+    const handlePageChange = (page: number) => {
+        setCurrentPage(page);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
 
     const getStatusStyles = (status: string) => {
         switch (status) {
@@ -58,18 +90,52 @@ export default function AspirationsPage() {
         }
     };
 
-    const handleUpdateStatus = (id: number, newStatus: Aspiration['status']) => {
-        setAspirations(prev => prev.map(asp => asp.id === id ? { ...asp, status: newStatus } : asp));
-        showToast.success(`Status aspirasi diperbarui menjadi ${newStatus}`);
-        if (selectedAspiration?.id === id) {
-            setSelectedAspiration(prev => prev ? { ...prev, status: newStatus } : null);
+    const handleUpdateStatus = async (id: number, newStatus: string) => {
+        setIsSubmitting(true);
+        const loadingToast = showToast.loading(`Memperbarui status menjadi ${newStatus}...`);
+
+        try {
+            await api.patch(`/aspirations/${id}/status`, { status: newStatus });
+            showToast.dismiss(loadingToast);
+            showToast.success(`Status aspirasi diperbarui menjadi ${newStatus}`);
+
+            if (selectedAspiration?.id === id) {
+                setSelectedAspiration({ ...selectedAspiration, status: newStatus as any });
+            }
+
+            fetchAspirations();
+        } catch (err: any) {
+            showToast.dismiss(loadingToast);
+            showToast.error(err.response?.data?.message || 'Gagal memperbarui status');
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
-    const handleDelete = (id: number) => {
-        setAspirations(prev => prev.filter(asp => asp.id !== id));
-        showToast.success('Aspirasi berhasil dihapus');
-        setSelectedAspiration(null);
+    const handleDelete = async (id: number) => {
+        if (!window.confirm('Apakah Anda yakin ingin menghapus aspirasi ini?')) return;
+
+        setIsSubmitting(true);
+        const loadingToast = showToast.loading('Menghapus aspirasi...');
+
+        try {
+            await api.delete(`/aspirations/${id}`);
+            showToast.dismiss(loadingToast);
+            showToast.success('Aspirasi berhasil dihapus');
+            setSelectedAspiration(null);
+            fetchAspirations();
+        } catch (err: any) {
+            showToast.dismiss(loadingToast);
+            showToast.error(err.response?.data?.message || 'Gagal menghapus aspirasi');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const formatDate = (dateString?: string) => {
+        if (!dateString) return '-';
+        const date = new Date(dateString);
+        return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
     };
 
     return (
@@ -100,7 +166,7 @@ export default function AspirationsPage() {
                                 }}
                             />
                         </div>
-                        <div className="flex bg-gray-50 p-1 rounded-2xl">
+                        <div className="flex bg-gray-50 p-1 rounded-2xl overflow-x-auto">
                             {(['All', 'Pending', 'Diproses', 'Selesai'] as const).map((s) => (
                                 <button
                                     key={s}
@@ -108,7 +174,7 @@ export default function AspirationsPage() {
                                         setStatusFilter(s);
                                         setCurrentPage(1);
                                     }}
-                                    className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${statusFilter === s
+                                    className={`px-6 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${statusFilter === s
                                         ? 'bg-white text-blue-500 shadow-md'
                                         : 'text-gray-400 hover:text-gray-600'
                                         }`}
@@ -121,75 +187,90 @@ export default function AspirationsPage() {
                 </div>
 
                 {/* Content Table/List */}
-                <div className="bg-white rounded-3xl shadow-lg overflow-hidden border border-gray-100">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left">
-                            <thead>
-                                <tr className="bg-gray-50/50">
-                                    <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Warga</th>
-                                    <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Kategori</th>
-                                    <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Isi Aspirasi</th>
-                                    <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Tanggal</th>
-                                    <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Status</th>
-                                    <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest text-right">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-50">
-                                {paginatedAspirations.map((asp) => (
-                                    <tr key={asp.id} className="group hover:bg-gray-50/50 transition-colors">
-                                        <td className="px-6 py-5">
-                                            <div className="flex items-center space-x-3">
-                                                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">
-                                                    {asp.userName.charAt(0)}
-                                                </div>
-                                                <div>
-                                                    <p className="font-bold text-gray-900 leading-none mb-1">{asp.userName}</p>
-                                                    <p className="text-xs text-gray-400">{asp.userEmail}</p>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-5">
-                                            <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-[10px] font-black uppercase">
-                                                {asp.category}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-5">
-                                            <p className="text-sm text-gray-600 max-w-xs truncate font-medium">{asp.content}</p>
-                                        </td>
-                                        <td className="px-6 py-5">
-                                            <div className="flex items-center text-gray-500 text-xs">
-                                                <Clock className="w-3.5 h-3.5 mr-1.5" />
-                                                <span className="font-bold">{asp.date}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-5">
-                                            <span className={`px-4 py-1 rounded-full text-[10px] font-black uppercase border animate-in fade-in zoom-in ${getStatusStyles(asp.status)}`}>
-                                                {asp.status}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-5 text-right">
-                                            <button
-                                                onClick={() => setSelectedAspiration(asp)}
-                                                className="p-2 hover:bg-white hover:shadow-md rounded-xl text-gray-400 hover:text-blue-500 transition-all group-hover:scale-110"
-                                            >
-                                                <Eye className="w-5 h-5" />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                {isLoading ? (
+                    <div className="flex flex-col items-center justify-center py-20 bg-white rounded-3xl shadow-lg">
+                        <Loader2 className="w-12 h-12 animate-spin text-blue-500 mb-4" />
+                        <p className="text-gray-400">Memuat aspirasi...</p>
                     </div>
-                </div>
+                ) : (
+                    <div className="bg-white rounded-3xl shadow-lg overflow-hidden border border-gray-100">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left">
+                                <thead>
+                                    <tr className="bg-gray-50/50">
+                                        <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Warga</th>
+                                        <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Kategori</th>
+                                        <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Isi Aspirasi</th>
+                                        <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Tanggal</th>
+                                        <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Status</th>
+                                        <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest text-right">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50">
+                                    {aspirations.map((asp) => (
+                                        <tr key={asp.id} className="group hover:bg-gray-50/50 transition-colors">
+                                            <td className="px-6 py-5">
+                                                <div className="flex items-center space-x-3">
+                                                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold uppercase">
+                                                        {asp.userName.charAt(0)}
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-gray-900 leading-none mb-1">{asp.userName}</p>
+                                                        <p className="text-xs text-gray-400">{asp.userEmail || '-'}</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-5">
+                                                <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-[10px] font-black uppercase">
+                                                    {asp.category}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-5">
+                                                <p className="text-sm text-gray-600 max-w-xs truncate font-medium">{asp.content}</p>
+                                            </td>
+                                            <td className="px-6 py-5">
+                                                <div className="flex items-center text-gray-500 text-xs">
+                                                    <Clock className="w-3.5 h-3.5 mr-1.5" />
+                                                    <span className="font-bold">{formatDate(asp.date || asp.createdAt)}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-5">
+                                                <span className={`px-4 py-1 rounded-full text-[10px] font-black uppercase border animate-in fade-in zoom-in ${getStatusStyles(asp.status)}`}>
+                                                    {asp.status}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-5 text-right">
+                                                <button
+                                                    onClick={() => setSelectedAspiration(asp)}
+                                                    className="p-2 hover:bg-white hover:shadow-md rounded-xl text-gray-400 hover:text-blue-500 transition-all group-hover:scale-110"
+                                                >
+                                                    <Eye className="w-5 h-5" />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+
+                                    {aspirations.length === 0 && (
+                                        <tr>
+                                            <td colSpan={6} className="px-6 py-12 text-center text-gray-400 italic">
+                                                Tidak ada aspirasi ditemukan
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
 
                 {/* Pagination */}
                 <div className="mt-8">
                     <Pagination
                         currentPage={currentPage}
                         totalPages={totalPages}
-                        onPageChange={setCurrentPage}
-                        totalItems={filteredAspirations.length}
-                        itemsPerPage={itemsPerPage}
+                        onPageChange={handlePageChange}
+                        totalItems={totalItems}
+                        itemsPerPage={ITEMS_PER_PAGE}
                     />
                 </div>
             </div>
@@ -231,14 +312,14 @@ export default function AspirationsPage() {
                                 <div className="space-y-1">
                                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Dikirim Oleh</p>
                                     <p className="font-bold text-gray-800 text-lg">{selectedAspiration.userName}</p>
-                                    <p className="text-sm text-gray-500">{selectedAspiration.userEmail}</p>
+                                    <p className="text-sm text-gray-500">{selectedAspiration.userEmail || '-'}</p>
                                 </div>
                                 <div className="space-y-1">
                                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tanggal Pengiriman</p>
-                                    <p className="font-bold text-gray-800 text-lg">{selectedAspiration.date}</p>
+                                    <p className="font-bold text-gray-800 text-lg">{formatDate(selectedAspiration.date || selectedAspiration.createdAt)}</p>
                                     <div className="flex items-center text-xs text-amber-500 font-bold">
                                         <Clock className="w-3.5 h-3.5 mr-1" />
-                                        <span>Menunggu Tanggapan</span>
+                                        <span>{selectedAspiration.status === 'Selesai' ? 'Telah Ditanggapi' : 'Menunggu Tanggapan'}</span>
                                     </div>
                                 </div>
                             </div>
@@ -255,14 +336,14 @@ export default function AspirationsPage() {
                                 <div className="flex items-center space-x-3">
                                     <button
                                         onClick={() => handleUpdateStatus(selectedAspiration.id, 'Diproses')}
-                                        disabled={selectedAspiration.status === 'Diproses'}
+                                        disabled={selectedAspiration.status === 'Diproses' || isSubmitting}
                                         className="px-6 py-3 bg-blue-50 text-blue-600 rounded-2xl font-black text-[10px] uppercase tracking-wider hover:bg-blue-100 disabled:opacity-50 transition-all border border-blue-100"
                                     >
                                         Tandai Diproses
                                     </button>
                                     <button
                                         onClick={() => handleUpdateStatus(selectedAspiration.id, 'Selesai')}
-                                        disabled={selectedAspiration.status === 'Selesai'}
+                                        disabled={selectedAspiration.status === 'Selesai' || isSubmitting}
                                         className="px-6 py-3 bg-green-50 text-green-600 rounded-2xl font-black text-[10px] uppercase tracking-wider hover:bg-green-100 disabled:opacity-50 transition-all border border-green-100"
                                     >
                                         Tandai Selesai
@@ -270,7 +351,8 @@ export default function AspirationsPage() {
                                 </div>
                                 <button
                                     onClick={() => handleDelete(selectedAspiration.id)}
-                                    className="p-4 bg-red-50 text-red-500 rounded-2xl hover:bg-red-100 transition-all border border-red-100 shadow-sm"
+                                    disabled={isSubmitting}
+                                    className="p-4 bg-red-50 text-red-500 rounded-2xl hover:bg-red-100 transition-all border border-red-100 shadow-sm disabled:opacity-50"
                                     title="Hapus Aspirasi"
                                 >
                                     <Trash2 className="w-6 h-6" />
