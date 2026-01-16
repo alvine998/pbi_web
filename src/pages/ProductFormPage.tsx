@@ -3,15 +3,25 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Save, X, Package, Tag, DollarSign, Database, Image as ImageIcon, Upload, Trash2 } from 'lucide-react';
 import { showToast } from '../utils/toast';
 import DashboardLayout from '../components/DashboardLayout';
+import api from '../utils/api';
+import { NumericFormat } from 'react-number-format';
 
 interface ProductFormData {
     name: string;
-    category: string;
+    categoryId: string;
     price: string;
     stock: string;
     status: 'Tersedia' | 'Stok Rendah' | 'Habis';
     image: string;
-    photos: string[];
+    photos: string[]; // base64 previews
+    photoFiles: File[]; // actual file objects for upload
+    description: string;
+}
+
+interface Category {
+    id: number;
+    name: string;
+    description?: string;
 }
 
 export default function ProductFormPage() {
@@ -19,30 +29,89 @@ export default function ProductFormPage() {
     const { id } = useParams();
     const isEditMode = !!id;
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const [categories, setCategories] = useState<Category[]>([]);
 
     const [formData, setFormData] = useState<ProductFormData>({
         name: '',
-        category: 'Elektronik',
+        categoryId: '',
         price: '',
         stock: '',
         status: 'Tersedia',
         image: '📦',
-        photos: []
+        photos: [],
+        photoFiles: [],
+        description: ''
     });
 
+    // Fetch categories from API
     useEffect(() => {
-        if (isEditMode) {
-            setFormData({
-                name: 'Contoh Produk ' + id,
-                category: 'Elektronik',
-                price: '15000000',
-                stock: '45',
-                status: 'Tersedia',
-                image: '💻',
-                photos: []
-            });
-        }
-    }, [id, isEditMode]);
+        const fetchCategories = async () => {
+            try {
+                const response = await api.get('/product/categories');
+                const data = response.data;
+
+                // Handle different response formats
+                let categoriesList: Category[] = [];
+                if (Array.isArray(data)) {
+                    categoriesList = data;
+                } else if (data.categories) {
+                    categoriesList = data.categories;
+                } else if (data.data) {
+                    categoriesList = Array.isArray(data.data) ? data.data : [];
+                } else if (data.items) {
+                    categoriesList = data.items;
+                }
+
+                setCategories(categoriesList);
+
+                // Set default category if available and form is empty
+                if (categoriesList.length > 0 && !formData.categoryId) {
+                    setFormData(prev => ({ ...prev, categoryId: categoriesList[0].id.toString() }));
+                }
+            } catch (error) {
+                console.error('Error fetching categories:', error);
+                showToast.error('Gagal memuat kategori');
+            }
+        };
+
+        fetchCategories();
+    }, []);
+
+    // Fetch product data when editing
+    useEffect(() => {
+        const fetchProduct = async () => {
+            if (!isEditMode || !id) return;
+
+            try {
+                setIsLoading(true);
+                const response = await api.get(`/products/${id}`);
+                const product = response.data.data || response.data;
+
+                console.log('Fetched product:', product);
+
+                setFormData({
+                    name: product.name || '',
+                    categoryId: product.categoryId?.toString() || product.category_id?.toString() || '',
+                    price: product.price?.toString() || '',
+                    stock: product.stock?.toString() || '',
+                    status: product.status || 'Tersedia',
+                    image: '�',
+                    photos: product.images || [],
+                    photoFiles: [], // Existing images don't have File objects
+                    description: product.description || ''
+                });
+            } catch (error: any) {
+                console.error('Error fetching product:', error);
+                showToast.error('Gagal memuat data produk');
+                navigate('/products');
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchProduct();
+    }, [id, isEditMode, navigate]);
 
     const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || []);
@@ -52,23 +121,28 @@ export default function ProductFormPage() {
             return;
         }
 
-        const newPhotos: string[] = [];
-
-        files.forEach(file => {
+        const validFiles = files.filter(file => {
             if (file.size > 1024 * 1024) {
                 showToast.error(`File ${file.name} melebihi 1MB`);
-                return;
+                return false;
             }
+            return true;
+        });
 
+        // Store the File objects
+        setFormData(prev => ({
+            ...prev,
+            photoFiles: [...prev.photoFiles, ...validFiles].slice(0, 5)
+        }));
+
+        // Create previews
+        validFiles.forEach(file => {
             const reader = new FileReader();
             reader.onloadend = () => {
-                newPhotos.push(reader.result as string);
-                if (newPhotos.length === files.filter(f => f.size <= 1024 * 1024).length) {
-                    setFormData(prev => ({
-                        ...prev,
-                        photos: [...prev.photos, ...newPhotos].slice(0, 5)
-                    }));
-                }
+                setFormData(prev => ({
+                    ...prev,
+                    photos: [...prev.photos, reader.result as string].slice(0, 5)
+                }));
             };
             reader.readAsDataURL(file);
         });
@@ -79,24 +153,108 @@ export default function ProductFormPage() {
     const removePhoto = (index: number) => {
         setFormData(prev => ({
             ...prev,
-            photos: prev.photos.filter((_, i) => i !== index)
+            photos: prev.photos.filter((_, i) => i !== index),
+            photoFiles: prev.photoFiles.filter((_, i) => i !== index)
         }));
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    // Upload images to /upload/multiple
+    const uploadImages = async (files: File[]): Promise<string[]> => {
+        if (files.length === 0) return [];
+
+        console.log('Uploading files:', files);
+
+        const formDataUpload = new FormData();
+        files.forEach((file, index) => {
+            formDataUpload.append('files', file, file.name);
+            console.log(`Appended file ${index}:`, file.name, file.type, file.size);
+        });
+
+        // Must set Content-Type to undefined to let browser set multipart/form-data with boundary
+        const response = await api.post('/upload/multiple', formDataUpload, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            },
+        });
+
+        console.log('Upload response:', response.data);
+
+        // Extract URLs from response
+        const uploadedFiles = response.data.files || [];
+        return uploadedFiles.map((file: { url: string }) => file.url);
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!formData.name || !formData.price || !formData.stock) {
+        if (!formData.name || !formData.price) {
             showToast.error('Mohon lengkapi semua field yang wajib diisi');
             return;
         }
 
-        console.log('Submitting Product:', formData);
-        showToast.success(isEditMode ? 'Produk berhasil diperbarui!' : 'Produk baru berhasil ditambahkan!');
-        navigate('/products');
+        if (isLoading) return;
+
+        setIsLoading(true);
+        const loadingToast = showToast.loading(isEditMode ? 'Menyimpan perubahan...' : 'Menambahkan produk...');
+
+        try {
+            // Upload new images first if any
+            let newImageUrls: string[] = [];
+            if (formData.photoFiles.length > 0) {
+                showToast.dismiss(loadingToast);
+                const uploadToast = showToast.loading('Mengunggah gambar...');
+                try {
+                    newImageUrls = await uploadImages(formData.photoFiles);
+                    showToast.dismiss(uploadToast);
+                } catch (uploadError: any) {
+                    showToast.dismiss(uploadToast);
+                    showToast.error(uploadError.response?.data?.message || 'Gagal mengunggah gambar');
+                    setIsLoading(false);
+                    return;
+                }
+            }
+
+            // Combine existing image URLs with newly uploaded ones
+            // Existing images are URLs (strings starting with http), new ones are from upload
+            const existingImageUrls = formData.photos.filter(photo =>
+                typeof photo === 'string' && photo.startsWith('http')
+            );
+            const allImages = [...existingImageUrls, ...newImageUrls];
+
+            const savingToast = showToast.loading(isEditMode ? 'Menyimpan perubahan...' : 'Menambahkan produk...');
+
+            const payload = {
+                name: formData.name,
+                price: parseFloat(formData.price),
+                categoryId: parseInt(formData.categoryId) || 0,
+                description: formData.description || '',
+                stock: parseInt(formData.stock) || 0,
+                status: formData.status,
+                images: allImages
+            };
+
+            if (isEditMode) {
+                // TODO: Use PUT /products/:id for update
+                await api.put(`/products/${id}`, payload);
+                showToast.dismiss(savingToast);
+                showToast.success('Produk berhasil diperbarui!');
+            } else {
+                await api.post('/products', payload);
+                showToast.dismiss(savingToast);
+                showToast.success('Produk baru berhasil ditambahkan!');
+            }
+
+            navigate('/products');
+        } catch (error: any) {
+            showToast.dismiss(loadingToast);
+            const errorMessage = error.response?.data?.message || 'Gagal menyimpan produk. Silakan coba lagi.';
+            showToast.error(errorMessage);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
-    const categories = ['Elektronik', 'Fashion', 'Kecantikan', 'Makanan & Minuman', 'Lainnya'];
     const statuses = ['Tersedia', 'Stok Rendah', 'Habis'];
 
     return (
@@ -198,13 +356,14 @@ export default function ProductFormPage() {
                                         <span>Kategori <span className="text-red-500">*</span></span>
                                     </label>
                                     <select
-                                        value={formData.category}
-                                        onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                                        value={formData.categoryId}
+                                        onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
                                         className="w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 transition-all duration-300 bg-white"
                                         style={{ borderColor: 'rgba(169, 169, 169, 0.4)', '--tw-ring-color': 'var(--color-info)' } as React.CSSProperties}
                                     >
+                                        <option value="">Pilih Kategori</option>
                                         {categories.map(cat => (
-                                            <option key={cat} value={cat}>{cat}</option>
+                                            <option key={cat.id} value={cat.id.toString()}>{cat.name}</option>
                                         ))}
                                     </select>
                                 </div>
@@ -215,14 +374,17 @@ export default function ProductFormPage() {
                                             <DollarSign className="w-4 h-4 text-gray-400" />
                                             <span>Harga (IDR) <span className="text-red-500">*</span></span>
                                         </label>
-                                        <input
-                                            type="number"
-                                            required
+                                        <NumericFormat
                                             value={formData.price}
-                                            onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                                            placeholder="0"
+                                            onValueChange={(values) => {
+                                                setFormData({ ...formData, price: values.value });
+                                            }}
+                                            thousandSeparator="."
+                                            decimalSeparator=","
+                                            prefix="Rp "
+                                            placeholder="Rp 0"
                                             className="w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 transition-all duration-300"
-                                            style={{ borderColor: 'rgba(169, 169, 169, 0.4)', '--tw-ring-color': 'var(--color-info)' } as React.CSSProperties}
+                                            style={{ borderColor: 'rgba(169, 169, 169, 0.4)' }}
                                         />
                                     </div>
                                     <div>
@@ -240,6 +402,22 @@ export default function ProductFormPage() {
                                             style={{ borderColor: 'rgba(169, 169, 169, 0.4)', '--tw-ring-color': 'var(--color-info)' } as React.CSSProperties}
                                         />
                                     </div>
+                                </div>
+
+                                {/* Description */}
+                                <div>
+                                    <label className="text-sm font-bold mb-2 flex items-center space-x-2" style={{ color: 'var(--color-dark-gray)' }}>
+                                        <Package className="w-4 h-4 text-gray-400" />
+                                        <span>Deskripsi Produk</span>
+                                    </label>
+                                    <textarea
+                                        value={formData.description}
+                                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                        placeholder="Masukkan deskripsi produk (opsional)"
+                                        rows={4}
+                                        className="w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 transition-all duration-300 resize-none"
+                                        style={{ borderColor: 'rgba(169, 169, 169, 0.4)', '--tw-ring-color': 'var(--color-info)' } as React.CSSProperties}
+                                    />
                                 </div>
                             </div>
 
@@ -276,27 +454,6 @@ export default function ProductFormPage() {
                                                 </span>
                                             </label>
                                         ))}
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label className="text-sm font-bold mb-2 flex items-center space-x-2" style={{ color: 'var(--color-dark-gray)' }}>
-                                        <ImageIcon className="w-4 h-4 text-gray-400" />
-                                        <span>Ikon Produk (Emoji)</span>
-                                    </label>
-                                    <div className="flex items-center space-x-4">
-                                        <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center text-4xl shadow-inner border border-gray-200">
-                                            {formData.image}
-                                        </div>
-                                        <input
-                                            type="text"
-                                            value={formData.image}
-                                            onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-                                            placeholder="Contoh: 💻"
-                                            maxLength={2}
-                                            className="flex-1 px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 transition-all duration-300"
-                                            style={{ borderColor: 'rgba(169, 169, 169, 0.4)', '--tw-ring-color': 'var(--color-info)' } as React.CSSProperties}
-                                        />
                                     </div>
                                 </div>
                             </div>

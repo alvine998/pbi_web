@@ -1,7 +1,8 @@
 import { useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BarChart3, Users, LogOut, Bell, User, Package, Image, Share2, Calendar, MessageSquare, ClipboardList, MessageCircle, Activity, Newspaper, Heart } from 'lucide-react';
+import { BarChart3, Users, LogOut, Bell, User, Package, Image, Share2, Calendar, MessageSquare, ClipboardList, MessageCircle, Activity, Newspaper, Heart, Tag } from 'lucide-react';
 import { showToast } from '../utils/toast';
+import { useAuth } from '../contexts/AuthContext';
 
 interface DashboardLayoutProps {
     children: ReactNode;
@@ -9,11 +10,13 @@ interface DashboardLayoutProps {
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
     const navigate = useNavigate();
+    const { user, logout } = useAuth();
     const [isSidebarOpen] = useState(true);
     const [isNotificationOpen, setIsNotificationOpen] = useState(false);
 
     const handleLogout = () => {
         showToast.info('Keluar...');
+        logout();
         setTimeout(() => {
             navigate('/login');
         }, 500);
@@ -55,6 +58,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                             [
                                 { icon: BarChart3, label: 'Ringkasan', path: '/dashboard' },
                                 { icon: Package, label: 'Produk', path: '/products' },
+                                { icon: Tag, label: 'Kategori Produk', path: '/product/categories' },
                                 { icon: Users, label: 'Pengguna', path: '/users' },
                                 { icon: Image, label: 'Media', path: '/media' },
                                 { icon: Share2, label: 'Social Media', path: '/social-media' },
@@ -192,8 +196,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                                     onClick={() => navigate('/profile')}
                                     className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold cursor-pointer hover:scale-110 active:scale-95 transition-all"
                                     style={{ backgroundColor: 'var(--color-info)' }}
+                                    title={user?.name || 'User'}
                                 >
-                                    <User className="w-5 h-5" />
+                                    {user?.name ? user.name.charAt(0).toUpperCase() : <User className="w-5 h-5" />}
                                 </div>
                             </div>
                         </div>

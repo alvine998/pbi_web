@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { showToast } from '../utils/toast';
 import api from '../utils/api';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function LoginPage() {
     const navigate = useNavigate();
+    const { login } = useAuth();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -27,9 +29,23 @@ export default function LoginPage() {
 
             showToast.dismiss(loadingToast);
 
-            // Store token if provided in response
-            if (response.data?.token) {
-                localStorage.setItem('token', response.data.token);
+            // Store session using auth context
+            const { token, user } = response.data;
+
+            if (token && user) {
+                login(token, {
+                    id: user.id,
+                    email: user.email,
+                    name: user.name || user.email,
+                    role: user.role,
+                });
+            } else if (token) {
+                // Fallback if user data is not in response
+                login(token, {
+                    id: 0,
+                    email: email,
+                    name: email,
+                });
             }
 
             showToast.success('Selamat datang kembali! Login berhasil.');
