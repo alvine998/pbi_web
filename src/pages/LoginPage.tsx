@@ -2,24 +2,45 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { showToast } from '../utils/toast';
+import api from '../utils/api';
 
 export default function LoginPage() {
     const navigate = useNavigate();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
 
-    const handleLogin = (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
-        // Show loading toast
+
+        if (isLoading) return;
+
+        setIsLoading(true);
         const loadingToast = showToast.loading('Sedang masuk...');
 
-        // Simulate API call
-        setTimeout(() => {
+        try {
+            const response = await api.post('/auth/login', {
+                email,
+                password,
+            });
+
             showToast.dismiss(loadingToast);
+
+            // Store token if provided in response
+            if (response.data?.token) {
+                localStorage.setItem('token', response.data.token);
+            }
+
             showToast.success('Selamat datang kembali! Login berhasil.');
             navigate('/dashboard');
-        }, 1000);
+        } catch (error: any) {
+            showToast.dismiss(loadingToast);
+            const errorMessage = error.response?.data?.message || 'Login gagal. Silakan coba lagi.';
+            showToast.error(errorMessage);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
