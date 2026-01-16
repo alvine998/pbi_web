@@ -8,10 +8,12 @@ import { useAuth } from '../contexts/AuthContext';
 
 interface Comment {
     id: number;
-    userId?: number;
-    userName?: string;
+    forumId: number;
+    userId: number;
+    userName?: string; // fallback if available or manual mapping
     content: string;
-    createdAt?: string;
+    createdAt: string;
+    updatedAt: string;
     likes?: number;
 }
 
@@ -73,19 +75,18 @@ export default function ForumDetailPage() {
             const response = await api.get(`/forum/${id}/comments`);
             const data = response.data;
 
-            // Handle various response formats
-            if (data.items) {
+            // Handle the requested response format
+            if (data && data.items) {
                 setComments(data.items);
             } else if (Array.isArray(data)) {
                 setComments(data);
-            } else if (data.data) {
+            } else if (data && data.data) {
                 setComments(Array.isArray(data.data) ? data.data : []);
             } else {
                 setComments([]);
             }
         } catch (err: any) {
             console.error('Error fetching comments:', err);
-            // Don't set error for comments, just show empty
             setComments([]);
         } finally {
             setIsCommentsLoading(false);
@@ -106,9 +107,8 @@ export default function ForumDetailPage() {
 
         try {
             await api.post(`/forum/${id}/comments`, {
-                content: newComment,
                 userId: user?.id || 0,
-                userName: user?.name || 'Anonymous'
+                content: newComment
             });
 
             showToast.dismiss(loadingToast);
