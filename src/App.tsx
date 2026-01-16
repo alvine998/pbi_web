@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import UsersPage from './pages/UsersPage';
@@ -27,29 +28,34 @@ function App() {
   return (
     <AuthProvider>
       <Routes>
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        {/* Public Routes */}
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/users" element={<UsersPage />} />
-        <Route path="/users/:id" element={<UserDetailPage />} />
-        <Route path="/products" element={<ProductsPage />} />
-        <Route path="/products/add" element={<ProductFormPage />} />
-        <Route path="/products/edit/:id" element={<ProductFormPage />} />
-        <Route path="/products/:id" element={<ProductDetailPage />} />
-        <Route path="/product/categories" element={<ProductCategoriesPage />} />
-        <Route path="/media" element={<MediaPage />} />
-        <Route path="/social-media" element={<SocialMediaPage />} />
-        <Route path="/events" element={<EventsPage />} />
-        <Route path="/forum" element={<ForumPage />} />
-        <Route path="/forum/:id" element={<ForumDetailPage />} />
-        <Route path="/polls" element={<PollsPage />} />
-        <Route path="/chat" element={<ChatPage />} />
-        <Route path="/activity-log" element={<ActivityLogPage />} />
-        <Route path="/news" element={<NewsPage />} />
-        <Route path="/profile" element={<ProfilePage />} />
-        <Route path="/notifications" element={<NotificationsPage />} />
-        <Route path="/notifications/:id" element={<NotificationDetailPage />} />
-        <Route path="/aspirations" element={<AspirationsPage />} />
+
+        {/* Protected Routes */}
+        <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+        <Route path="/users" element={<ProtectedRoute><UsersPage /></ProtectedRoute>} />
+        <Route path="/users/:id" element={<ProtectedRoute><UserDetailPage /></ProtectedRoute>} />
+        <Route path="/products" element={<ProtectedRoute><ProductsPage /></ProtectedRoute>} />
+        <Route path="/products/add" element={<ProtectedRoute><ProductFormPage /></ProtectedRoute>} />
+        <Route path="/products/edit/:id" element={<ProtectedRoute><ProductFormPage /></ProtectedRoute>} />
+        <Route path="/products/:id" element={<ProtectedRoute><ProductDetailPage /></ProtectedRoute>} />
+        <Route path="/product/categories" element={<ProtectedRoute><ProductCategoriesPage /></ProtectedRoute>} />
+        <Route path="/media" element={<ProtectedRoute><MediaPage /></ProtectedRoute>} />
+        <Route path="/social-media" element={<ProtectedRoute><SocialMediaPage /></ProtectedRoute>} />
+        <Route path="/events" element={<ProtectedRoute><EventsPage /></ProtectedRoute>} />
+        <Route path="/forum" element={<ProtectedRoute><ForumPage /></ProtectedRoute>} />
+        <Route path="/forum/:id" element={<ProtectedRoute><ForumDetailPage /></ProtectedRoute>} />
+        <Route path="/polls" element={<ProtectedRoute><PollsPage /></ProtectedRoute>} />
+        <Route path="/chat" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
+        <Route path="/activity-log" element={<ProtectedRoute><ActivityLogPage /></ProtectedRoute>} />
+        <Route path="/news" element={<ProtectedRoute><NewsPage /></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+        <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
+        <Route path="/notifications/:id" element={<ProtectedRoute><NotificationDetailPage /></ProtectedRoute>} />
+        <Route path="/aspirations" element={<ProtectedRoute><AspirationsPage /></ProtectedRoute>} />
+
+        {/* 404 Page */}
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </AuthProvider>
