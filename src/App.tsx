@@ -24,6 +24,7 @@ import NotFoundPage from './pages/NotFoundPage';
 import AspirationsPage from './pages/AspirationsPage';
 import ProductCategoriesPage from './pages/ProductCategoriesPage';
 import NewsDetailPage from './pages/NewsDetailPage';
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 
 function App() {
   return (
@@ -56,6 +57,7 @@ function App() {
         <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
         <Route path="/notifications/:id" element={<ProtectedRoute><NotificationDetailPage /></ProtectedRoute>} />
         <Route path="/aspirations" element={<ProtectedRoute><AspirationsPage /></ProtectedRoute>} />
+        <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
 
         {/* 404 Page */}
         <Route path="*" element={<NotFoundPage />} />
