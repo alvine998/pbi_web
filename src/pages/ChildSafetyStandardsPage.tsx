@@ -135,8 +135,8 @@ export default function ChildSafetyStandardsPage() {
 
                 {section.id === 'contact' && (
                   <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <p className="text-gray-800 font-semibold">Email: safety@example.com</p>
-                    <p className="text-gray-800 font-semibold">Support Team: support@example.com</p>
+                    <p className="text-gray-800 font-semibold">Email: safety@pbi.web.id</p>
+                    <p className="text-gray-800 font-semibold">Support Team: support@pbi.web.id</p>
                     <p className="text-gray-600 mt-2 text-sm">
                       We prioritize child safety reports and review them as quickly as possible.
                     </p>
