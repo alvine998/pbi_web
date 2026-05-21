@@ -25,6 +25,7 @@ import AspirationsPage from './pages/AspirationsPage';
 import ProductCategoriesPage from './pages/ProductCategoriesPage';
 import NewsDetailPage from './pages/NewsDetailPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import ChildSafetyStandardsPage from './pages/ChildSafetyStandardsPage';
 
 function App() {
   return (
@@ -58,6 +59,7 @@ function App() {
         <Route path="/notifications/:id" element={<ProtectedRoute><NotificationDetailPage /></ProtectedRoute>} />
         <Route path="/aspirations" element={<ProtectedRoute><AspirationsPage /></ProtectedRoute>} />
         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+        <Route path="/child-safety-standards" element={<ChildSafetyStandardsPage />} />
 
         {/* 404 Page */}
         <Route path="*" element={<NotFoundPage />} />
